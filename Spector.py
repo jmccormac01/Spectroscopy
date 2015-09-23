@@ -325,7 +325,7 @@ def Analyse():
 		if i==0:
 			arcid=templist2[0]
 			refarc.append(arcid)
-			iraf.identify(images=arcid,coordlist="/Users/James/Desktop/cuar_cune.dat")
+			iraf.identify(images=arcid,coordlist="/Users/James/Documents/LineLists/cuar_cune.dat")
 			iraf.reidentify(reference=refarc[1],images=templist2[1])
 		if i>0:
 			print "\nReidentifying arclines from " + str(refarc[1])
