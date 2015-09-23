@@ -1,46 +1,72 @@
 ########################################################################################
 ################################## SPECTOR.py ##########################################
 ########################################################################################
-
-# INT/IDS Spectra Reduction v1.02
+#
+# 	INT/IDS Spectral Reduction v2.0: A Script for complete reduction of INT/IDS data
+#		
+#								James McCormac
 #	
 #	Before running Spector:
 #		- 	Remove all files that should not be included in reduction
-#			i.e. bad flats, data from other central wavelengths or grattings etc
-#			place all this data in a folder called 'junk'. Use *.int logfile to
-#			see whats what for each night
+#			i.e. bad flats, data from other central wavelengths or gratings etc.
+#			Place all this data in a folder called 'junk'. Use *.int logfile to
+#			help weed out unwanted files
+#		-	Adjust the settings in the **EDIT HERE** section below
 #
+#	Assumptions:
+#		-	This code was written for a particular observing strategy:
+#				Acquire, Arc, Science, Arc, REPEAT...
+#			Therefore the script is looking for this structure in the data when matching 
+#			arcs to spectra. This can be easily changed by modifying the relevant section
+# 
 # 	What Spector does:
 #		- 	Prepares the working environment, making copies of original data
 #		-	Loads IRAF
 #		- 	Strips multi extension fits to single extension
-#		- 	Renames files to easier viewing. 
-#				i_* = object (spectra)
+#		- 	Renames files for easier viewing:
+#				i_* = integration (spectra)
 #				a_* = arc
 #				b_* = bias
 #				f_* = flat
-#		-	Debiases and flat fields the data
+#		-	Debiases and flat field corrects the data
 #		- 	Tidies up calibration frames into 'calibs' folder
-#		- 	Trims the spectra based on INT's heavily vignetted region
-#		-	Set's JD and Airmass (Note JD needs updating to Eastman 2010's method)
-#		- 	Interactive spectral analysis with KPNOSLIT in IRAF
-#		- 	Contains line atlas for previous IDS EBLM run (Atlas to be updated with 
-#			each new wavelength observed) 	
+#		- 	Trims the spectra based on INT's heavily vignetted region, see TRIMSEC below
+#		-	Sets JD and Airmass (Note JD needs updating to Eastman 2010's method)
+#		- 	Interactive spectral analysis with KPNOSLIT in IRAF 	
+#		- 	Normalises the spectra	
 #		- 	Tidies up working directory after reductions are finished
 #
-#	Questions:
+#	What Spector does not do:
+#		- 	Flux calibration
+#
+#	What you will end up with:
+#		-	A set of reduced, wavelength calibrated, normalised 1D spectra with the 
+#			byproducts from each step located in subdirectories within the 'reduced'
+#			folder. 
+#
+#	Who to annoy if you have questions:
 #		jmccormac001@gmail.com
 #
 
 # modules imported
-from numpy import * 
-#from numarray import *                       
+from numpy import *                       
 import os, sys, string, math
 import pyfits
 import time
 import commands
-from pyraf import iraf
 
+#################################
+########### EDIT HERE ###########
+#################################
+
+lineList_location = "/Users/James/Documents/LineLists/cuar_cune.dat"
+loginCl_location = "/Users/James/"
+
+GAIN="1.03"
+RDNOISE="3.48"
+TRIMSEC='[1:360,1000:3000]'
+
+#################################
 
 def Makedirs():
 	if os.path.isdir('original') == False:
@@ -72,7 +98,6 @@ def CopyFiles():
 		print str(f3) + " copied to reduction folder"
 	
 	# move the login and pyraf files into reduced
-	os.system("mv login.cl ../")
 	os.system("mv pyraf/ ../")
 	
 	# leave off in reduced dir for working
@@ -128,24 +153,23 @@ def StripFiles():
 	return 0
 
 def Zerocombine():
-	iraf.zerocombine(input="b_s_r*",output="Zero", combine="median", reject="minmax", ccdtype="zero", process="no", delete="no", clobber="no", scale="none", statsec="", nlow="0", nhigh="1", nkeep="1" , mclip="yes", lsigma="3.", hsigma="3.", rdnoise="3.48", gain="0.91", snoise="0.", pclip="-0.5", blank="0.")
+	iraf.zerocombine(input="b_s_r*",output="Zero", combine="median", reject="minmax", ccdtype="zero", process="no", delete="no", clobber="no", scale="none", statsec="", nlow="0", nhigh="1", nkeep="1" , mclip="yes", lsigma="3.", hsigma="3.", rdnoise=RDNOISE, gain=GAIN, snoise="0.", pclip="-0.5", blank="0.")
 	return 0
-
 
 def ProcFlats():
 	iraf.ccdproc(images="f_s_r*",output="", ccdtype="", max_cache="0", noproc="no", fixpix="no", overscan="no",trim="no", zerocor="yes", darkcor="no", flatcor="no", illumcor="no", fringecor="no",readcor="no", scancor="no", readaxis="line", fixfile="", biassec="", trimsec="",zero="Zero.fits", dark="", flat="", illum="", fringe="", minreplace="1.",scantype="shortscan", nscan="1", interactive="no", function="chebyshev", order="1", sample="*", naverage="1", niterate="1", low_reject="3.", high_reject="3.", grow="1.")
 	return 0
 	
 def Flatcombine():	
-	iraf.flatcombine (input="f_s_r*",output="Flat", combine="median", reject="avsigclip", ccdtype="flat", process="no", subsets="yes", delete="no", clobber="no", scale="mode", statsec="", nlow="1", nhigh="1", nkeep="1", mclip="yes", lsigma="3.", hsigma="3.", rdnoise="3.48", gain="0.91",snoise="0.", pclip="-0.5", blank="1.")
+	iraf.flatcombine(input="f_s_r*",output="Flat", combine="median", reject="avsigclip", ccdtype="flat", process="no", subsets="yes", delete="no", clobber="no", scale="mode", statsec="", nlow="1", nhigh="1", nkeep="1", mclip="yes", lsigma="3.", hsigma="3.", rdnoise=RDNOISE, gain=GAIN,snoise="0.", pclip="-0.5", blank="1.")
 	return 0
 
 def ProcArcs():
-	iraf.ccdproc (images="a_s_r*",output="", ccdtype="", max_cache="0", noproc="no", fixpix="no", overscan="no", trim="no", zerocor="yes", darkcor="no", flatcor="yes", illumcor="no", fringecor="no", readcor="no", scancor="no", readaxis="line", fixfile="", biassec="", trimsec="",zero="Zero.fits", dark="", flat="Flat.fits", illum="", fringe="",minreplace="1.", scantype="shortscan", nscan="1", interactive="no", function="chebyshev", order="1", sample="*", naverage="1", niterate="1", low_reject="3.", high_reject="3.", grow="1.")
+	iraf.ccdproc(images="a_s_r*",output="", ccdtype="", max_cache="0", noproc="no", fixpix="no", overscan="no", trim="no", zerocor="yes", darkcor="no", flatcor="yes", illumcor="no", fringecor="no", readcor="no", scancor="no", readaxis="line", fixfile="", biassec="", trimsec="",zero="Zero.fits", dark="", flat="Flat.fits", illum="", fringe="",minreplace="1.", scantype="shortscan", nscan="1", interactive="no", function="chebyshev", order="1", sample="*", naverage="1", niterate="1", low_reject="3.", high_reject="3.", grow="1.")
 	return 0
 	
 def ProcSpec():
-	iraf.ccdproc (images="i_s_r*",output="", ccdtype="", max_cache="0", noproc="no", fixpix="no", overscan="no",trim="no", zerocor="yes", darkcor="no", flatcor="yes", illumcor="no", fringecor="no", readcor="no", scancor="no", readaxis="line", fixfile="", biassec="", trimsec="",zero="Zero.fits", dark="", flat="Flat.fits", illum="", fringe="",minreplace="1.", scantype="shortscan", nscan="1", interactive="no",function="chebyshev", order="1", sample="*", naverage="1", niterate="1", low_reject="3.", high_reject="3.", grow="1.")
+	iraf.ccdproc(images="i_s_r*",output="", ccdtype="", max_cache="0", noproc="no", fixpix="no", overscan="no",trim="no", zerocor="yes", darkcor="no", flatcor="yes", illumcor="no", fringecor="no", readcor="no", scancor="no", readaxis="line", fixfile="", biassec="", trimsec="",zero="Zero.fits", dark="", flat="Flat.fits", illum="", fringe="",minreplace="1.", scantype="shortscan", nscan="1", interactive="no",function="chebyshev", order="1", sample="*", naverage="1", niterate="1", low_reject="3.", high_reject="3.", grow="1.")
 	return 0
 
 def CleanCalibs():
@@ -168,7 +192,7 @@ def CleanCalibs():
 
 def TrimFiles():
 	
-	section='[1:360,1000:3000]'
+	section=TRIMSEC
 	os.mkdir("untrimmed")
 	print "Directory Created: 'untrimmed'"
 	
@@ -202,7 +226,7 @@ def Analyse():
 	# make a list of the science images to be analysed
 	templist=commands.getoutput('ls i_s*').split('\n')
 			
-	#Apall Parameters
+	# apall parameters
 	iraf.apall.setParam('format','multispec') 	
 	iraf.apall.setParam('interac','yes')     				
 	iraf.apall.setParam('find','yes') 
@@ -248,7 +272,7 @@ def Analyse():
 	iraf.apall.setParam('clean','yes')
 	iraf.apall.setParam('saturat','40000')
 	iraf.apall.setParam('readnoi','4.38')
-	iraf.apall.setParam('gain','1.03')
+	iraf.apall.setParam('gain',GAIN)
 	iraf.apall.setParam('lsigma','4.0')
 	iraf.apall.setParam('usigma','4.0')
 	iraf.apall.setParam('nsubaps','1')
@@ -268,6 +292,9 @@ def Analyse():
 		# extract the object spectrum
 		print "Extracting spectrum of " + str(object) + " from image " + str(image)
 		print "Check aperture and background. Change if required"
+		print "AP: m = mark aperture, d = delete aperture"
+		print "SKY: s = mark sky, t = delete sky, f = refit"
+		print "q = continue"
 		iraf.apall(input=image)
 		print "Spectrum extracted!"
 	
@@ -303,29 +330,22 @@ def Analyse():
 		print templist2[1]
 		
 		if i==0:
-			print "\nSelect correct arc lines from atlas"
-			print "Press 'f' to fit, press 'l' to check fit"
-			print "\n---------------------------------------------------"
-			print "\t\tCuAr+CuNe line atlas"
-			print "---------------------------------------------------"
-			print "High Dispersion"
-			print "Central Wavelength: 6500A"
-			print "\t 1: 6217.281"
-			print "\t 2: 6266.495"
-			print "\t 3: 6304.789"
-			print "\t 4: 6334.428"
-			print "\t 5: 6382.991"
-			print "\t 6: Skip (saturated)"
-			print "\t 7: 6506.528"
-			print "\t 8: 6532.882"
-			print "\t 9: 6598.953"
-			print "\t10: 6678.277"
-			print "\t11: 6717.043\n"
-		
+			print "\nIdentify arc lines:"
+			print "Enter the following in the splot window"
+			print "\t:thres 500"
+			print "\t:order 3"
+			print "\tfwidth 2"
+			print "Select 3-5 arc lines from line atlas"
+			print "Press 'm' to mark, then enter wavelength"
+			print "Then press 'l' to automatically ID the other lines"
+			print "Press 'f' to fit the dispersion correction"
+			print "Use 'd' to remove bad points, 'f' to refit"
+			print "'q' from fit, then 'q' from identify to continue\n"
+					
 		if i==0:
 			arcid=templist2[0]
 			refarc.append(arcid)
-			iraf.identify(images=arcid,coordlist="/Users/James/Documents/LineLists/cuar_cune.dat")
+			iraf.identify(images=arcid,coordlist=lineList_location)
 			iraf.reidentify(reference=refarc[1],images=templist2[1])
 		if i>0:
 			print "\nReidentifying arclines from " + str(refarc[1])
@@ -400,12 +420,19 @@ print '---------------------------------------------------------\n'
 starttime=time.ctime()
 print 'Program started on '+starttime
 
+# load IRAF from directory where the login.cl file is
+here=os.getcwd()
+os.chdir(loginCl_location)
+from pyraf import iraf
+os.chdir(here)
+
 time.sleep(2)
 
-print "Cleaned out the junk?"
+print "Script set up and junk removed?"
 junk_yn = raw_input("(e.g. y): ")
 if str(junk_yn)=='n':
-	print "Go back and weed out the bad frames, exiting!"
+	print "Edit the EDIT HERE section of the script and/or"
+	print "go back and weed out the bad frames, exiting!"
 	exit()
 	
 print "Setup work environment?"
