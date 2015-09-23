@@ -34,7 +34,7 @@
 
 # modules imported
 from numpy import * 
-from numarray import *                       
+#from numarray import *                       
 import os, sys, string, math
 import pyfits
 import time
@@ -69,7 +69,7 @@ def CopyFiles():
 		f3=templist[i]
 		f4="../reduced/"+str(templist[i])
 		os.system("cp %s %s" % (f3, f4))
-		print str(f3) + " copied reduction folder"
+		print str(f3) + " copied to reduction folder"
 	
 	# move the login and pyraf files into reduced
 	os.system("mv login.cl ../")
@@ -168,7 +168,7 @@ def CleanCalibs():
 
 def TrimFiles():
 	
-	section='[1:251,1000:3000]'
+	section='[1:360,1000:3000]'
 	os.mkdir("untrimmed")
 	print "Directory Created: 'untrimmed'"
 	
@@ -215,10 +215,10 @@ def Analyse():
 	iraf.apall.setParam('review','yes') 
 	
 	iraf.apall.setParam('line','INDEF') 
-	iraf.apall.setParam('nsum','10') 
+	iraf.apall.setParam('nsum','12') 
 	
-	iraf.apall.setParam('lower','-5') 
-	iraf.apall.setParam('upper','5') 
+	iraf.apall.setParam('lower','-6') 
+	iraf.apall.setParam('upper','6') 
 	
 	iraf.apall.setParam('b_funct','chebyshev') 
 	iraf.apall.setParam('b_order','1') 
@@ -248,7 +248,7 @@ def Analyse():
 	iraf.apall.setParam('clean','yes')
 	iraf.apall.setParam('saturat','40000')
 	iraf.apall.setParam('readnoi','4.38')
-	iraf.apall.setParam('gain','0.91')
+	iraf.apall.setParam('gain','1.03')
 	iraf.apall.setParam('lsigma','4.0')
 	iraf.apall.setParam('usigma','4.0')
 	iraf.apall.setParam('nsubaps','1')
@@ -325,7 +325,7 @@ def Analyse():
 		if i==0:
 			arcid=templist2[0]
 			refarc.append(arcid)
-			iraf.identify(images=arcid)
+			iraf.identify(images=arcid,coordlist="/Users/James/Desktop/cuar_cune.dat")
 			iraf.reidentify(reference=refarc[1],images=templist2[1])
 		if i>0:
 			print "\nReidentifying arclines from " + str(refarc[1])
