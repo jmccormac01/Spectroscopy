@@ -376,7 +376,8 @@ def Analyse():
 def RoundUpFiles():
 
 	templist=commands.getoutput('ls *_tn.ms.fits').split('\n')
-	os.mkdir('spectra_r')
+	if os.path.exists('spectra_r') == False:
+		os.mkdir('spectra_r')
 	
 	for i in range(0,len(templist)):
 		f1="spectra_r/"+str(templist[i])
@@ -392,7 +393,9 @@ def RoundUpArcs():
 	templist2=commands.getoutput('ls i*t.fits').split('\n')
 	templist3=commands.getoutput('ls a*t.ms.fits').split('\n')
 	templist4=commands.getoutput('ls a*t.fits').split('\n')
-	os.mkdir('unnormalized')
+	
+	if os.path.exists('unnormalized') == False:
+		os.mkdir('unnormalized')
 	
 	for i in range(0,len(templist)):
 		f1="unnormalized/"+str(templist[i])
