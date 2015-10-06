@@ -3,8 +3,9 @@
 # IRAF- FXCOR in python
 
 from pyraf import iraf
-import commands
-import pyfits
+import glob as g
+from astropy.io import fits
+import sys
 
 def ImportPackages():
 	iraf.noao(_doprint=0)
@@ -13,7 +14,6 @@ def ImportPackages():
 	iraf.kpnoslit(_doprint=0)	
 	iraf.ccdred(_doprint=0)
 	iraf.astutil(_doprint=0)
-	
 	return 0
 
 # import packages from IRAF
@@ -23,19 +23,24 @@ if str(imported)!='0':
 	print "Problem importing IRAF packages, exiting!"
 	exit()
 
-
 # get list of directory
-templist=commands.getoutput('ls *_tn.ms.fits').split('\n')
+t=g.glob('*_tn.ms.fits')
 
-if str(templist[0]) == 'ls: *_tn.ms.fits: No such file or directory':
-	templist=commands.getoutput('ls *_tn.ms.fits').split('\n')
+# find the reference star
+ref_star="HD168009"
+object_id=[]
+for i in t:
+	h=fits.open(i)[0].header['OBJECT']
+	object_id.append(h)
 
-templist2=commands.getoutput('ls *_tn-S.ms.fits').split('\n')
+try:
+	template_loc=object_id.index(ref_star)
+except ValueError:
+	print "Reference star %s not found, exiting..." % (ref_star)
+	sys.exit(1) 
 
-template=templist2[0]
-
-hdulist=pyfits.open(template)
-prihdr=hdulist[0].header
+template=t[template_loc]
+print "Ref star %s found as spectrum %s" % (ref_star,template)
 
 iraf.keywpars.setParam('ra','RA') 
 iraf.keywpars.setParam('dec','DEC')
@@ -53,7 +58,6 @@ iraf.keywpars.setParam('vhelio','VHELIO')
 iraf.keywpars.setParam('vlsr','VLSR')
 iraf.keywpars.setParam('vsun','VSUN')
 iraf.keywpars.setParam('mode','ql')
-
 
 iraf.fxcor.setParam('continu','both')
 iraf.fxcor.setParam('filter','none')
@@ -85,22 +89,22 @@ iraf.fxcor.setParam('observa','lapalma')
 iraf.fxcor.setParam('mode','ql')
 
 
-for i in range(0,len(templist)):
-	object=templist[i]
-	
-	target=str(templist[i])
-	
-	outfile=str(target)+"-"+str(i)
-	
-	iraf.fxcor(objects=object,template=template,osample='6600-6800',rsample='6600-6800',output=outfile)
-	
-	logfile=str(outfile)+".log"
-	
-	f=file(logfile,'r')
-	s=f.readlines()
-	f.close()
-	
-	vshift=s[-9].split('=')[1].split(' ')[1]
+# need to write a function to get the following numbers from the log file:
+# peak_shift_pix       
+# correlation_height   
+# fwhm_peak_pix        
+# fwhm_peak_kms        
+# relative_velocity_kms
+# observed_velocity_kms
+# helio_velocity_kms   
+# and log them to the database where image_id = t[i]
 
-	print "Target: " + str(target) + "\tMeasured shift: " + str(vshift) + " Km/sec\n"
+for i in range(0,len(t)):
+	object=t[i]
+	outfile="%s.out" % (object)
+	iraf.fxcor(objects=object,template=template,osample='6600-6800',rsample='6600-6800',output=outfile)
+	logfile=str(outfile)+".log"
+	f=file(logfile,'r').readlines()
+	vshift=f[-9].split('=')[1].split(' ')[1]
+	print "Target: %s\tMeasured shift: %s km/s\n" % (object_id[i],vshift)
 

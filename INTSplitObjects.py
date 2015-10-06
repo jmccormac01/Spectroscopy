@@ -23,16 +23,17 @@ if str(sort_yn) == 'y':
 compare_yn = raw_input("Compare? (e.g. y): ")
 if str(compare_yn) == 'y':
 
-	t=g.glob('*t.ms.fits')
+	t=g.glob('*tn.ms.fits')
 	h=fits.open(t[0])
 	ref_spec=h[0].data[0][0]
 	
 	for i in range(1,len(t)):
-		hdulist=pyfits.open(t[i])
-		check_spec=hdulist[0].data[0][0]
+		h2=fits.open(t[i])
+		check_spec=h2[0].data[0][0]
 		
 		dif_spec=ref_spec-check_spec		
 		pl.title('Ref Spec - Check Spec')
 		pl.plot(dif_spec)
 		pl.show()
 		
+

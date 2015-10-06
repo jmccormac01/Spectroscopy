@@ -47,6 +47,9 @@
 #	Who to annoy if you have questions:
 #		jmccormac001@gmail.com
 #
+# Changes:
+# 	2015-10-06: Removed setdJD and setAirmass as they were deeply broken!
+#
 
 # modules imported
 from numpy import *                       
@@ -214,13 +217,13 @@ def TrimFiles():
 		os.rename(templist2[i], f3)
 	return 0
 
-def SetJD():
-	iraf.setjd(images="*.fits", date="date", time='utmiddle', exposur="exptime", ra="ra", dec="dec", epoch="cat-epoc", jd="jd", hjd="hjd", ljd="ljd", utdate="yes", uttime="yes", listonl="no", mode="ql")
-	return 0
+#def SetJD():
+#	iraf.setjd(images="*.fits", date="date", time='utmiddle', exposur="exptime", ra="ra", dec="dec", epoch="cat-epoc", jd="jd", hjd="hjd", ljd="ljd", utdate="yes", uttime="yes", listonl="no", mode="ql")
+#	return 0
 	
-def SetAirmass():
-	iraf.setairmass(images="*.fits", ra="ra", dec="dec", equinox="cat-epoc", st="st", ut="utstart", date="date", exposur="exptime", airmass="airmass", utmiddl="utmiddle", show="yes", update="yes", overrid="yes",mode="ql")
-	return 0
+#def SetAirmass():
+#	iraf.setairmass(images="*.fits", ra="cat-ra", dec="cat-dec", equinox="cat-epoc", st="st", ut="utstart", date="date", exposur="exptime", airmass="airmass", utmiddl="utmiddle", show="yes", update="yes", overrid="yes",mode="ql")
+#	return 0
 
 def Analyse():
 	# make a list of the science images to be analysed
@@ -533,24 +536,24 @@ if str(trim_yn) == 'y':
 		print "Problem trimming frames, exiting!"
 		exit()
 
-print "Set AIRMASS and HJD?"
-am_yn = raw_input("(e.g y): ")
-if str(am_yn) == 'y':
-	# Set airmass
-	print "Setting Airmass..."
-	time.sleep(1)
-	airmass_set=SetAirmass()
-	if airmass_set != 0:
-		print "Problem setting airmass, exiting!"
-		exit()
-		
-	# Set JD
-	print "Setting JD..."
-	time.sleep(1)	
-	jd_set=SetJD()
-	if jd_set !=0:
-		print "Problem setting JD, exiting!"
-		exit()
+#print "Set AIRMASS and HJD?"
+#am_yn = raw_input("(e.g y): ")
+#if str(am_yn) == 'y':
+#	# Set airmass
+#	print "Setting Airmass..."
+#	time.sleep(1)
+#	airmass_set=SetAirmass()
+#	if airmass_set != 0:
+#		print "Problem setting airmass, exiting!"
+#		exit()
+#		
+#	# Set JD
+#	print "Setting JD..."
+#	time.sleep(1)	
+#	jd_set=SetJD()
+#	if jd_set !=0:
+#		print "Problem setting JD, exiting!"
+#		exit()
 	
 print "Analyse the specta interactively?"
 analyse_yn = raw_input("(e.g y): ")

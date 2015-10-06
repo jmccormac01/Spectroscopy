@@ -12,6 +12,8 @@
 # 25/07/11	- 	code writen
 # 25/07/11	-	code tested
 
+# run this after Spector to fix the broken times coming from IRAF
+# use DATE-OBS and UTSTART to fix UTMIDDLE, JD and HJD
 
 
 from numpy import * 

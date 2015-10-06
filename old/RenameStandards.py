@@ -3,7 +3,7 @@
 #								Description
 # ----------------------------------------------------------------------------------
 #
-# RenameStandards.py - Plot scintillation with exposure time 
+# RenameStandards.py - Rename standard stars for FXCOR
 
 # ----------------------------------------------------------------------------------
 # 								Update History
@@ -19,5 +19,4 @@ t=cmd.getoutput('ls i_s_r*.fits').split('\n')
 for i in range(0,len(t)):
 	f1=t[i]
 	f2="%s-S.ms.fits" % (t[i].split('.')[0])
-	
 	os.system('cp %s %s' % (f1, f2))
