@@ -2,6 +2,7 @@
 # IRAF- FXCOR in python
 # 
 # to do:
+#	check the names are ok in the database - go through the logs again :(
 #
 
 from pyraf import iraf
@@ -35,7 +36,7 @@ def ImportPackages():
 	iraf.keywpars.setParam('ra','CAT-RA') 
 	iraf.keywpars.setParam('dec','CAT-DEC')
 	iraf.keywpars.setParam('ut','UT')
-	iraf.keywpars.setParam('utmiddl','UTMIDDLE')
+	iraf.keywpars.setParam('utmiddl','UT-M_E')
 	iraf.keywpars.setParam('exptime','EXPTIME')
 	iraf.keywpars.setParam('epoch','CAT-EPOC')
 	iraf.keywpars.setParam('date_ob','DATE-OBS')

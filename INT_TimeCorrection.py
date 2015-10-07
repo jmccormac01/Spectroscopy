@@ -333,13 +333,14 @@ for i in range(0,len(t)):
 	HJD[i],JD_e[i]=gethjd(float(xt.year),float(xt.month),float(xt.day),float(xt.hour),float(xt.minute),float(xt.second)+float(xt.microsecond/1.0E6),float(c_ra.hms.h),float(c_ra.hms.m),float(c_ra.hms.s),float(c_dec.dms.d),float(c_dec.dms.m),float(c_dec.dms.s))
 	print "%s %s %s %.2f %s %s %.8f" % (object,ra,dec,exptime,start_times[i],mid_times[i],HJD[i])
 	
-	# ok so now we have the real JD-MID, HJD-MID and UTMIDDLE
+	# ok so now we have the real JD-MID (JD_e), HJD-MID and UT-M_e (UTMIDDLE will NOT update correctly!)
 	# update the headers of the spectra
 	iraf.hedit(images=t[i],fields='HJD',value=str('%.8f' % HJD[i]),add='yes',verify='no',show='yes')
-	iraf.hedit(images=t[i],fields='JD_e',value='xxx',add='yes',verify='no',show='yes')
-	iraf.hedit(images=t[i],fields='JD_e',value=str('%.8f' % JD_e[i]),add='yes',verify='no',show='yes')
-	iraf.hedit(image=t[i],field='UTMIDDLE',value="%s" % (mid_times[i].iso.replace(' ','T')),add='yes',ver='no',show='yes')
+	iraf.hedit(images=t[i],fields='JD_E',value='xxx',add='yes',verify='no',show='yes')
+	iraf.hedit(images=t[i],fields='JD_E',value=str('%.8f' % JD_e[i]),add='yes',verify='no',show='yes')
+	iraf.hedit(images=t[i],fields='UT-M_E',value='xxx',add='yes',verify='no',show='yes')
+	iraf.hedit(images=t[i],fields='UT-M_E',value=str('%s' % (mid_times[i].iso.replace(' ','T'))),add='yes',verify='no',show='yes')
 
 # ensure the airmass is ok now that utmiddle etc are fixed	
-iraf.setairmass(images="*.fits", ra="cat-ra", dec="cat-dec", equinox="cat-epoc", st="st", ut="utstart", date="date", exposur="exptime", airmass="airmass", utmiddl="utmiddle", show="yes", update="yes", overrid="yes",mode="ql")	
+iraf.setairmass(images="*.fits", ra="cat-ra", dec="cat-dec", equinox="cat-epoc", st="st", ut="utstart", date="date-obs", exposur="exptime", airmass="airmass", utmiddl="ut-mid", show="yes", update="yes", overrid="yes",mode="ql")	
 

@@ -39,8 +39,9 @@ for i in t:
 	object_name=hdr['OBJECT']
 	hjd_mid=hdr['HJD']
 	n_traces=d.shape[1]
+	utmiddle=hdr['UT-M_E']
 	
-	qry="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces) VALUES ('%s','%s','%s','%s',%f,%d)" % (db_tab,image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces)
+	qry="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,utmiddle) VALUES ('%s','%s','%s','%s',%f,%d,'%s')" % (db_tab,image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,utmiddle.replace("T"," "))
 	cur.execute(qry)
 	db.commit()
 	

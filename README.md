@@ -6,18 +6,20 @@ Process for reducing IDS spectra: <br/>
 3. Run LogSpectraToDB.py on each night's data to log the images to the database. This will be added to later when FXCOR is ran <br/>
 4. Check for common template RV standards across all nights <br/>
 5. Analyse the single stars (n_traces=1) first. Blends need a more carefull analysis afterwards (n_traces>1) <br/>
-6. Run FXCOR.py to get RV shifts. FXCOR will log all the values to the database <br/>
-7. Repeat 5 and 6 for the BLENDs.  <br/>
+6. Check that FXCOR settings are coorect (osample etc)
+7. Run FXCOR.py to get RV shifts. FXCOR will log all the values to the database <br/>
+8. Repeat 6 and 7 for the BLENDs.  <br/>
 <br/>
 In step 3 we log the following to the database for easier analysis later <br/>
 	1. image_id <br/>
-	2. object_id <br/>
-	3. hjd_mid <br/>
-	4. n_traces <br/>
-	5. template_id <br/>
-	6. ref_star <br/>
+	2. object_name <br/>
+	3. template_image_id <br/>
+	4. ref_star_name <br/>
+	5. hjd_mid <br/>
+	6. utmiddle <br/>
+	7. n_traces <br/>	
 <br/>
-Then in step 5 (and 7) we add the following values from FXCOR: <br/>
+Then in step 7 (and 8) we add the following values from FXCOR: <br/>
 	1. peak_shift_pix <br/>
 	2. correlation_height <br/>   
 	3. fwhm_peak_pix <br/>
@@ -27,3 +29,4 @@ Then in step 5 (and 7) we add the following values from FXCOR: <br/>
 	7. helio_velocity_kms  <br/>  
 <br/>
 BLENDSs need more attention to extract the right trace ID (e.g. PA | PA+180) <br/>
+We also  add the spectral type and swasp_id to the database for easier cross matching later <br/>
