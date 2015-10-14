@@ -26,7 +26,18 @@ Then in step 7 (and 8) we add the following values from FXCOR: <br/>
 	4. fwhm_peak_kms  <br/>       
 	5. relative_velocity_kms  <br/>
 	6. observed_velocity_kms  <br/>
-	7. helio_velocity_kms  <br/>  
+	7. helio_velocity_kms  <br/> 
+	8. commnets <br />
+	9. swasp_id - populated later <br/> 
 <br/>
+
+We also add the following eblm parameters to the database for easier analysis using the EBLMParamsToDB.py script: <br/>
+	1. swasp_id <br/>
+	2. period <br/>   
+	3. epoch <br/>
+	4. Vmag  <br/>       
+	5. paramfit_spec_type  <br/>
+
+We then cross match the two tables to add the swasp_id to the spectra <br/>
+
 BLENDSs need more attention to extract the right trace ID (e.g. PA | PA+180) <br/>
-We also  add the spectral type and swasp_id to the database for easier cross matching later <br/>
