@@ -1,5 +1,7 @@
 # script to load combined mcmc and orion eblm table 
 # into the database EBLM params table
+# also to grab the spectral types from the Targets Description file
+# and cross match the object_names with swasp_ids for easier analysis later
 
 import pymysql
 import argparse as ap
@@ -82,7 +84,7 @@ if args.swaspids:
 			else:
 				print "object_name: %s NOT SWASP OBJECT?" % (row[1])
 		
-		# DO THE MULTIPLES BY HAND!
+		print "DO THE MULTIPLES BY HAND!"
 			
 	
 if not args.debug:
