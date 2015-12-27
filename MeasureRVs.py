@@ -1,6 +1,6 @@
 # script to measure the RVs for a given object
 
-import pymysql
+import pymysql, sys
 from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as pl
@@ -82,6 +82,7 @@ def phasePlot(swasp_id,object_name,epoch,period,hjd_mid,relative_velocity_kms,fw
 blends = 'n'
 object_list=getUniqueObjectList()
 
+track=1
 for i in object_list.keys():
 	sum=0
 	for j in object_list[i]:
@@ -98,7 +99,8 @@ for i in object_list.keys():
 		p2p=max(relative_velocity_kms)-min(relative_velocity_kms)
 		
 		# print a summary of the objects data
-		print "\nSWASPID: %s" % (swasp_id)
+		print "\nTracker: %d" % (track) 
+		print "SWASPID: %s" % (swasp_id)
 		print "Target:  %s, n_RV: %d" % (i, len(image_id))
 		print "Period:  %.6f d, Epoch: %.6f, V: %.2f SpecType: %s" % (period,epoch,vmag,spectype)
 		print "Peak to Peak: %.4f km/s, Error: %.4f km/s " % (p2p,np.average(fwhm_peak_kms))
@@ -109,5 +111,13 @@ for i in object_list.keys():
 		plt=raw_input('Phase & Plot?: ')
 		if plt.lower()=='y':
 			phasePlot(swasp_id,i,epoch,period,hjd_mid,relative_velocity_kms,fwhm_peak_kms)
+		elif plt.lower()=='x':
+			sys.exit(1)
+		elif plt.lower().startswith('np'):
+			while plt.startswith('np'):
+				phasePlot(swasp_id,i,epoch,float(plt.split()[1]),hjd_mid,relative_velocity_kms,fwhm_peak_kms)
+				plt=raw_input('Phase & Plot?: ')	
+
+		track+=1
 
 			

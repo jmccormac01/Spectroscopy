@@ -19,7 +19,7 @@ args=argParse()
 db=pymysql.connect(host='localhost',db='eblm')
 cur=db.cursor()
 
-qry="UPDATE eblm_parameters SET %s=%s WHERE swasp_id='%s'" % (args.param,args.value,args.swaspid)
+qry="UPDATE eblm_parameters SET %s='%s' WHERE swasp_id='%s'" % (args.param,args.value,args.swaspid)
 cur.execute(qry)
 db.commit()
 
