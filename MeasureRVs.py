@@ -5,9 +5,12 @@ from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as pl
 
-# set up the database
-db=pymysql.connect(host='localhost',db='eblm')
-cur=db.cursor()
+def argParse():
+	parser=ap.ArgumentParser()
+	parser.add_argument('--track',type=int,help='starting id')
+	return parser.parse_args()
+
+args=argParse()
 
 # function to generate a list of unique objects
 def getAllInfo(object_in):
@@ -78,16 +81,24 @@ def phasePlot(swasp_id,object_name,epoch,period,hjd_mid,relative_velocity_kms,fw
 	pl.xlabel('Phase')
 	pl.ylabel('RV (km/s)')
 	pl.show()
+
+
+# set up the database
+db=pymysql.connect(host='localhost',db='eblm')
+cur=db.cursor()
 	
 blends = 'n'
 object_list=getUniqueObjectList()
-
 track=1
 for i in object_list.keys():
 	sum=0
 	for j in object_list[i]:
 		sum+=j
 	if sum==len(object_list[i]):
+		# if selecting the track ID to startr on, skip to it
+		if args.track and track < args.track:
+			track+=1
+			continue
 		# if this is true there are no blends
 		# get all info about object X	
 		image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,swasp_id,period,epoch,vmag,spectype=getAllInfo(i)
