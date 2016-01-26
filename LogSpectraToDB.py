@@ -5,7 +5,6 @@
 import pymysql
 from astropy.io import fits
 import glob as g
-import matplotlib.pyplot as pl
 
 # globals
 ref_star_name="HD168009"
@@ -39,10 +38,10 @@ for i in t:
 	object_name=hdr['OBJECT']
 	hjd_mid=hdr['HJD']
 	n_traces=d.shape[1]
+	pa=hdr['ROTSKYPA']
 	utmiddle=hdr['UT-M_E']
 	
-	qry="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,utmiddle) VALUES ('%s','%s','%s','%s',%f,%d,'%s')" % (db_tab,image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,utmiddle.replace("T"," "))
+	qry="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,sky_pa,utmiddle) VALUES ('%s','%s','%s','%s',%f,%d,%f,'%s')" % (db_tab,image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,pa,utmiddle.replace("T"," "))
 	cur.execute(qry)
 	db.commit()
 	
-        

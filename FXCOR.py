@@ -2,7 +2,6 @@
 # IRAF- FXCOR in python
 # 
 # to do:
-#	check the names are ok in the database - go through the logs again :(
 #
 
 from pyraf import iraf
@@ -118,7 +117,7 @@ n_traces=getNTraces(t)
 
 # import packages from IRAF
 imported=ImportPackages()
-if str(imported)!='0':
+if imported!=0:
 	print "Problem importing IRAF packages, exiting!"
 	exit()
 
@@ -141,14 +140,21 @@ for i in range(0,len(t)):
 		image_id=t[i]
 		outfile="%s.out" % (image_id)
 		iraf.fxcor(objects=image_id,template=template_image_id,osample='6600-6800',rsample='6600-6800',output=outfile)
-		logfile=str(outfile)+".log"
+		logfile="%s.log" % (outfile)
 	
 		com=''
 		while (com.upper() not in coms):
 			com=raw_input('Single Peaked = SP - Double Peaked = DP - Broad Peak = BP - No Peak = NP\nEnter comment: ')
 			
 		done=logOutput(logfile,image_id,com)
-	
-	# code up the BLENDs later when analysed the first time
-	# if args.blends=='yblends' and n_traces[i] > 1:
-	#
+
+# add this back into the loop later	
+# code up the BLENDs later when analysed the first time
+if args.blends=='yblends' and n_traces[i] > 1:
+	image_id="i_s_r1142230_tn.ms.fits"
+	outfile="%s.out" % (image_id)
+	template_image_id="i_s_r1142128_tn.ms.fits"
+	logfile="%s.log" % (outfile)
+	iraf.fxcor(objects=image_id,template=template_image_id,osample='6600-6800',rsample='6600-6800',output=outfile)
+
+

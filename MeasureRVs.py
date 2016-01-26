@@ -15,8 +15,8 @@ args=argParse()
 
 # function to generate a list of unique objects
 def getAllInfo(object_in):
-	image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment=[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
-	qry="SELECT image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment FROM eblm_ids WHERE object_name='%s'" % (object_in)
+	image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment=[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+	qry="SELECT image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment FROM eblm_ids WHERE object_name='%s'" % (object_in)
 	print qry
 	cur.execute(qry)	
 	for row in cur:
@@ -39,6 +39,7 @@ def getAllInfo(object_in):
 	# move numbers to np.array as they are nicer to work on later
 	hjd_mid=np.array(hjd_mid)
 	n_traces=np.array(n_traces)
+	sky_pa=np.array(sky_pa)
 	peak_shift_pix=np.array(peak_shift_pix)
 	correlation_height=np.array(correlation_height)
 	fwhm_peak_pix=np.array(fwhm_peak_pix)
@@ -59,10 +60,10 @@ def getAllInfo(object_in):
 	
 	try:
 		swasp_id
-		return image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,swasp_id,period,epoch,vmag,spectype
+		return image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,swasp_id,period,epoch,vmag,spectype
 	except NameError:
 		print "\n\nNO SWASPID FOUND FOR %s\n\n" % (object_in)
-		return image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,"",1.0,5000.0000,15.0,"XX"
+		return image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,"",1.0,5000.0000,15.0,"XX"
 	
 def getUniqueObjectList():
 	qry="SELECT object_name,n_traces FROM eblm_ids"
@@ -102,7 +103,7 @@ for i in object_list.keys():
 			continue
 		# if this is true there are no blends
 		# get all info about object X	
-		image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,swasp_id,period,epoch,vmag,spectype=getAllInfo(i)
+		image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,swasp_id,period,epoch,vmag,spectype=getAllInfo(i)
 		
 		# check for unmatched objects and skip them
 		if swasp_id=="":
