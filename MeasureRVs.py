@@ -4,6 +4,7 @@ import pymysql, sys
 from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as pl
+import argparse as ap
 
 def argParse():
 	parser=ap.ArgumentParser()
