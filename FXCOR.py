@@ -16,7 +16,6 @@ db_tab="eblm_ids"
 
 # set up the database
 db=pymysql.connect(host='localhost',db='eblm')
-cur=db.cursor()
 
 def argParse():
 	parser=ap.ArgumentParser()
@@ -78,15 +77,15 @@ def getNTraces(imlist):
 	n_traces=[]
 	for i in range(0,len(imlist)):
 		qry="SELECT n_traces FROM %s WHERE image_id='%s'" % (db_tab,imlist[i])
-		cur.execute(qry)
-		for row in cur:
-			n_traces.append(row[0])
+		with db.cursor() as cur:
+			cur.execute(qry)
+			for row in cur:
+				n_traces.append(row[0])
 	# check that we got 1 n_trace for each image
 	assert len(n_traces) == len(imlist)	
 	return n_traces
 
-# log the out of FXCOR to the database
-def logOutput(logfile,image_id,com):
+def parseOutput(logfile):
 	f=open(logfile).readlines()
 	peak_shift_pix=f[35].split()[4]
 	correlation_height=f[36].split()[3]
@@ -95,10 +94,34 @@ def logOutput(logfile,image_id,com):
 	relative_velocity_kms=f[39].split()[5]
 	observed_velocity_kms=f[40].split()[3]
 	helio_velocity_kms=f[41].split()[3]
+	return peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms
+
+# update the table with the output from FXCOR 
+def updateOutput(logfile,image_id,com):
+	peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms=parseOutput(logfile)
 	qry="UPDATE %s SET peak_shift_pix=%s, correlation_height=%s, fwhm_peak_pix=%s, fwhm_peak_kms=%s, relative_velocity_kms=%s, observed_velocity_kms=%s, helio_velocity_kms=%s, comment='%s' WHERE image_id='%s'" % (db_tab,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,com,image_id)
-	cur.execute(qry)
-	db.commit()
+	with db.cursor() as cur:
+		cur.execute(qry)
+		db.commit()
 	return 0
+
+# if n_traces > 1, we need new rows so use insert
+def insertOutput(image_id,updated_image_id,logfile):
+	peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms=parseOutput(logfile)
+	qry="SELECT object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa FROM %s WHERE image_id='%s'" % (db_tab,image_id) 
+	with db.cursor() as cur:
+		cur.execute(qry)
+		for row in cur:
+			obj=row[0]
+			template_image_id=row[1]
+			ref_star_name=row[2]
+			hjd_mid=row[3]
+			utmiddle=row[4]
+			sky_pa=row[5]
+		# use n_traces = -1 for split traces
+		qry2="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms) VALUES ()" % (db_tab)
+		# HEREE!!! continue with adding split traces to the database 
+
 
 ############
 ### MAIN ###
@@ -136,25 +159,29 @@ print "Ref star %s found as spectrum %s" % (ref_star_name,template_image_id)
 
 # loop over the spectra
 for i in range(0,len(t)):
+	image_id=t[i]
 	if args.blends == 'nblends' and n_traces[i] == 1:
-		image_id=t[i]
 		outfile="%s.out" % (image_id)
 		iraf.fxcor(objects=image_id,template=template_image_id,osample='6600-6800',rsample='6600-6800',output=outfile)
 		logfile="%s.log" % (outfile)
 	
 		com=''
 		while (com.upper() not in coms):
-			com=raw_input('Single Peaked = SP - Double Peaked = DP - Broad Peak = BP - No Peak = NP\nEnter comment: ')
-			
-		done=logOutput(logfile,image_id,com)
+			com=raw_input('Single Peaked = SP - Double Peaked = DP - Broad Peak = BP - No Peak = NP\nEnter comment: ')	
+		done=updateOutput(logfile,image_id,com)
 
-# add this back into the loop later	
-# code up the BLENDs later when analysed the first time
-if args.blends=='yblends' and n_traces[i] > 1:
-	image_id="i_s_r1142230_tn.ms.fits"
-	outfile="%s.out" % (image_id)
-	template_image_id="i_s_r1142128_tn.ms.fits"
-	logfile="%s.log" % (outfile)
-	iraf.fxcor(objects=image_id,template=template_image_id,osample='6600-6800',rsample='6600-6800',output=outfile)
+	# add this back into the loop later	
+	# code up the BLENDs later when analysed the first time
+	if args.blends=='yblends' and n_traces[i] > 1:
+		for j in range(1,n_traces[i]+1):
+			outfile="%s.out%d" % (image_id,j)
+			logfile="%s.log%d" % (outfile,j)
+			iraf.fxcor(objects=image_id,template=template_image_id,apertures=str(j),osample='6600-6800',rsample='6600-6800',output=outfile)
+
+			com=''
+			while (com.upper() not in coms):
+				com=raw_input('Single Peaked = SP - Double Peaked = DP - Broad Peak = BP - No Peak = NP\nEnter comment: ')
+			updated_image_id="%s-%d" % (image_id,j)
+			done=logOutput(logfile,updated_image_id,com)
 
 
