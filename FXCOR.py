@@ -106,9 +106,9 @@ def updateOutput(logfile,image_id,com):
 	return 0
 
 # if n_traces > 1, we need new rows so use insert
-def insertOutput(image_id,updated_image_id,logfile):
+def insertOutput(logfile,image_id,updated_image_id,com):
 	peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms=parseOutput(logfile)
-	qry="SELECT object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa FROM %s WHERE image_id='%s'" % (db_tab,image_id) 
+	qry="SELECT object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa FROM %s WHERE image_id='%s' LIMIT 1" % (db_tab,image_id) 
 	with db.cursor() as cur:
 		cur.execute(qry)
 		for row in cur:
@@ -118,9 +118,16 @@ def insertOutput(image_id,updated_image_id,logfile):
 			hjd_mid=row[3]
 			utmiddle=row[4]
 			sky_pa=row[5]
-		# use n_traces = -1 for split traces
-		qry2="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms) VALUES ()" % (db_tab)
-		# HEREE!!! continue with adding split traces to the database 
+	# use n_traces = -1 for split traces
+	qry2='''INSERT INTO %s 
+		(image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,
+		sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,
+		observed_velocity_kms,helio_velocity_kms,comment) 
+		VALUES 
+		('%s','%s','%s','%s','%s','%s',-1,'%s','%s','%s','%s','%s','%s','%s','%s','%s')''' % (db_tab,updated_image_id,obj,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,com)
+	with db.cursor() as cur:
+		cur.execute(qry)
+		db.commit()
 
 
 ############
@@ -175,13 +182,13 @@ for i in range(0,len(t)):
 	if args.blends=='yblends' and n_traces[i] > 1:
 		for j in range(1,n_traces[i]+1):
 			outfile="%s.out%d" % (image_id,j)
-			logfile="%s.log%d" % (outfile,j)
+			logfile="%s.log" % (outfile)
 			iraf.fxcor(objects=image_id,template=template_image_id,apertures=str(j),osample='6600-6800',rsample='6600-6800',output=outfile)
 
 			com=''
 			while (com.upper() not in coms):
 				com=raw_input('Single Peaked = SP - Double Peaked = DP - Broad Peak = BP - No Peak = NP\nEnter comment: ')
 			updated_image_id="%s-%d" % (image_id,j)
-			done=logOutput(logfile,updated_image_id,com)
+			done=insertOutput(logfile,image_id,updated_image_id,com)
 
 
