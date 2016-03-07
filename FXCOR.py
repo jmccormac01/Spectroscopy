@@ -108,7 +108,7 @@ def updateOutput(logfile,image_id,com):
 # if n_traces > 1, we need new rows so use insert
 def insertOutput(logfile,image_id,updated_image_id,com):
 	peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms=parseOutput(logfile)
-	qry="SELECT object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa FROM %s WHERE image_id='%s' LIMIT 1" % (db_tab,image_id) 
+	qry="SELECT object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,swasp_id FROM %s WHERE image_id='%s' LIMIT 1" % (db_tab,image_id) 
 	with db.cursor() as cur:
 		cur.execute(qry)
 		for row in cur:
@@ -118,17 +118,21 @@ def insertOutput(logfile,image_id,updated_image_id,com):
 			hjd_mid=row[3]
 			utmiddle=row[4]
 			sky_pa=row[5]
+			swasp_id=row[6]
 	# use n_traces = -1 for split traces
 	qry2='''INSERT INTO %s 
 		(image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,
 		sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,
-		observed_velocity_kms,helio_velocity_kms,comment) 
+		observed_velocity_kms,helio_velocity_kms,comment,swasp_id) 
 		VALUES 
-		('%s','%s','%s','%s','%s','%s',-1,'%s','%s','%s','%s','%s','%s','%s','%s','%s')''' % (db_tab,updated_image_id,obj,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,com)
-	with db.cursor() as cur:
-		cur.execute(qry)
-		db.commit()
-
+		('%s','%s','%s','%s','%s','%s',-1,'%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')''' % (db_tab,updated_image_id,obj,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,com,swasp_id)
+	print(qry2)
+	try:
+		with db.cursor() as cur:
+			cur.execute(qry2)
+			db.commit()
+	except:
+		print "This entry already appears in the database"
 
 ############
 ### MAIN ###

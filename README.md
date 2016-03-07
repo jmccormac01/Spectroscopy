@@ -41,3 +41,7 @@ We also add the following eblm parameters to the database for easier analysis us
 We then cross match the two tables to add the swasp_id to the spectra <br/>
 
 BLENDSs need more attention to extract the right trace ID (e.g. PA | PA+180) <br/>
+I've now updated FXCOR to account for multiple objects in the slit. The plan is to use the SkyPA to distinguish between the spectra. 
+
+For the blended objects use the correctBlends.py script to fix the trace ids. MeasureRVs.py can then use the updated trace IDs to plot the right spectra with each other.  <br/>
+
