@@ -65,9 +65,9 @@ for i in pa.keys():
 				print i,image_ids[i][k],pa[i][k]
 			
 			if invert==True:
-				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(-1,-n_traces[i]-1)[::-1])
+				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(-1,-n_traces[i]-1,-1)[::-1])
 			else:
-				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(-1,-n_traces[i]-1))
+				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(-1,-n_traces[i]-1,-1))
 	print "\n"
 
 
