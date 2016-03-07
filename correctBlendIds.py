@@ -12,7 +12,7 @@ db=pymysql.connect(host='localhost',db='eblm')
 
 def updateTraceOrders(image_ids,trace_orders):
 	for i in range(0,len(image_ids)):
-		qry="UPDATE eblm_ids SET n_traces=%d WHERE image_id=%s LIMIT 1" % (trace_orders[i],image_ids[i])
+		qry="UPDATE eblm_ids SET n_traces=%d WHERE image_id='%s' LIMIT 1" % (trace_orders[i],image_ids[i])
 		print qry
 		with db.cursor() as cur:
 			cur.execute(qry)
@@ -65,9 +65,9 @@ for i in pa.keys():
 				print i,image_ids[i][k],pa[i][k]
 			
 			if invert==True:
-				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(1,n_traces[i]+1)[::-1])
+				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(-1,-n_traces[i]-1)[::-1])
 			else:
-				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(1,n_traces[i]+1))
+				updateTraceOrders(image_ids[i][j:j+n_traces[i]],range(-1,-n_traces[i]-1))
 	print "\n"
 
 
