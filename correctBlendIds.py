@@ -12,7 +12,7 @@ db=pymysql.connect(host='localhost',db='eblm')
 
 def updateTraceOrders(image_ids,trace_orders):
 	for i in range(0,len(image_ids)):
-		qry="UPDATE eblm_ids SET n_traces=%d WHERE image_id='%s' LIMIT 1" % (trace_orders[i],image_ids[i])
+		qry="UPDATE eblm_ids_new SET n_traces=%d WHERE image_id='%s' LIMIT 1" % (trace_orders[i],image_ids[i])
 		print qry
 		with db.cursor() as cur:
 			cur.execute(qry)
@@ -22,7 +22,7 @@ image_ids=defaultdict(list)
 n_spectra=defaultdict(list)
 n_traces=defaultdict(list)
 pa=defaultdict(list)
-qry="SELECT image_id,object_name,sky_pa,n_traces FROM eblm_ids WHERE n_traces<0 AND current_status != 'IGNORE' ORDER BY object_name"
+qry="SELECT image_id,object_name,sky_pa,n_traces FROM eblm_ids_new WHERE n_traces<0 AND current_status != 'IGNORE' ORDER BY object_name"
 with db.cursor() as cur:
 	cur.execute(qry)
 	for row in cur:

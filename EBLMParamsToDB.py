@@ -61,7 +61,7 @@ if args.swaspids:
 		for row in cur:
 			swasp_id.append(row[0])
 	
-	qry="SELECT image_id,object_name from eblm_ids"
+	qry="SELECT image_id,object_name from eblm_ids_new"
 	multiples=defaultdict(list)
 	if not args.debug:
 		cur.execute(qry)
@@ -74,7 +74,8 @@ if args.swaspids:
 			
 			if len(matches) ==1:
 				print "object_name: %s --> swasp_id: %s" % (row[1],matches[0])
-				qry="UPDATE eblm_ids SET swasp_id='%s' WHERE image_id='%s'" % (matches[0],row[0])
+				qry="UPDATE eblm_ids_new SET swasp_id='%s' WHERE image_id='%s'" % (matches[0],row[0])
+				#print qry
 				cur2.execute(qry)
 				db.commit()
 				continue

@@ -1,14 +1,18 @@
 Scripts for analysing spectroscopy, primarily from IDS
 
+Data is stored in the eblm_ids_new table <br/>
+<br/>
+
 Process for reducing IDS spectra: <br/>
 1. Run Spector.py on a nightly basis and extract all the 1D spectra <br/>
 2. Run INT_TimeCorrection.py to fix the times/airmass in the headers. Values from IRAF are a mess. SetJD and SetAirmass disabled in Spector as of 20151006 <br/>
-3. Run LogSpectraToDB.py on each night's data to log the images to the database. This will be added to later when FXCOR is ran <br/>
-4. Check for common template RV standards across all nights <br/>
-5. Analyse the single stars (n_traces=1) first. Blends need a more carefull analysis afterwards (n_traces>1) <br/>
-6. Check that FXCOR settings are coorect (osample etc)
-7. Run FXCOR.py to get RV shifts. FXCOR will log all the values to the database <br/>
-8. Repeat 6 and 7 for the BLENDs.  <br/>
+3. Apply the radial velocity correction using RVcorrect.py<br/>
+4. Run LogSpectraToDB.py on each night's data to log the images to the database. This will be added to later when FXCOR is ran <br/>
+5. Check for common template RV standards across all nights <br/>
+6. Analyse the single stars (n_traces=1) first. Blends need a more careful analysis afterwards (n_traces>1) <br/>
+7. Check that FXCOR settings are coorect (osample etc)
+8. Run FXCOR.py to get RV shifts. FXCOR will log all the values to the database <br/>
+9. Repeat 6 and 7 for the BLENDs.  <br/>
 <br/>
 In step 3 we log the following to the database for easier analysis later <br/>
 	1. image_id <br/>
@@ -27,8 +31,9 @@ Then in step 7 (and 8) we add the following values from FXCOR: <br/>
 	5. relative_velocity_kms  <br/>
 	6. observed_velocity_kms  <br/>
 	7. helio_velocity_kms  <br/> 
-	8. commnets <br />
-	9. swasp_id - populated later <br/> 
+	8. comments <br />
+	9. ccf height <br />
+	10. tonry & davis r-value <br />
 <br/>
 
 We also add the following eblm parameters to the database for easier analysis using the EBLMParamsToDB.py script: <br/>

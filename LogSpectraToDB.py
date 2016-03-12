@@ -8,7 +8,7 @@ import glob as g
 
 # globals
 ref_star_name="HD168009"
-db_tab="eblm_ids"
+db_tab="eblm_ids_new"
 
 # set up the database
 db=pymysql.connect(host='localhost',db='eblm')
@@ -40,8 +40,11 @@ for i in t:
 	n_traces=d.shape[1]
 	pa=hdr['ROTSKYPA']
 	utmiddle=hdr['UT-M_E']
+	vhelio=hdr['VHELIO']
+	vlsr=hdr['VLSR']
+	vsun=hdr['VSUN']
 	
-	qry="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,sky_pa,utmiddle) VALUES ('%s','%s','%s','%s',%f,%d,%f,'%s')" % (db_tab,image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,pa,utmiddle.replace("T"," "))
+	qry="INSERT INTO %s (image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,sky_pa,utmiddle,vhelio,vlsr,vsun) VALUES ('%s','%s','%s','%s',%f,%d,%f,'%s',%f,%f,'%s')" % (db_tab,image_id,object_name,template_image_id,ref_star_name,hjd_mid,n_traces,pa,utmiddle.replace("T"," "),vhelio,vlsr,vsun)
 	cur.execute(qry)
 	db.commit()
 	

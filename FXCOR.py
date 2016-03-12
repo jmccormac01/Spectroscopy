@@ -12,7 +12,7 @@ import sys, pymysql
 
 # globals
 ref_star_name="HD168009"
-db_tab="eblm_ids"
+db_tab="eblm_ids_new"
 
 # set up the database
 db=pymysql.connect(host='localhost',db='eblm')
@@ -108,7 +108,7 @@ def updateOutput(logfile,image_id,com):
 # if n_traces > 1, we need new rows so use insert
 def insertOutput(logfile,image_id,updated_image_id,com):
 	peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms=parseOutput(logfile)
-	qry="SELECT object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,swasp_id FROM %s WHERE image_id='%s' LIMIT 1" % (db_tab,image_id) 
+	qry="SELECT object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,swasp_id,vhelio,vlsr,vsun FROM %s WHERE image_id='%s' LIMIT 1" % (db_tab,image_id) 
 	with db.cursor() as cur:
 		cur.execute(qry)
 		for row in cur:
@@ -119,13 +119,16 @@ def insertOutput(logfile,image_id,updated_image_id,com):
 			utmiddle=row[4]
 			sky_pa=row[5]
 			swasp_id=row[6]
+			vhelio=row[7]
+			vlsr=row[8]
+			vsun=row[9]
 	# use n_traces = -1 for split traces
 	qry2='''INSERT INTO %s 
 		(image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,
 		sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,
-		observed_velocity_kms,helio_velocity_kms,comment,swasp_id) 
+		observed_velocity_kms,helio_velocity_kms,comment,swasp_id,ccf_height,tdr,vhelio,vlsr,vsun,width) 
 		VALUES 
-		('%s','%s','%s','%s','%s','%s',-1,'%s','%s','%s','%s','%s','%s','%s','%s','%s','%s')''' % (db_tab,updated_image_id,obj,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,com,swasp_id)
+		('%s','%s','%s','%s','%s','%s',-1,'%s','%s','%s','%s','%s','%s','%s','%s','%s','%s',%s,%s,'%s')''' % (db_tab,updated_image_id,obj,template_image_id,ref_star_name,hjd_mid,utmiddle,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,com,swasp_id,vhelio,vlsr,vsun)
 	print(qry2)
 	try:
 		with db.cursor() as cur:
