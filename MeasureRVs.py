@@ -13,6 +13,7 @@ def argParse():
 	parser=ap.ArgumentParser()
 	parser.add_argument('blends',choices=['yblends','nblends'],help='analyse blended objects?')
 	parser.add_argument('--track',type=int,help='starting id')
+	parser.add_argument('--swasp_id',help="swasp_id of the object you want")
 	return parser.parse_args()
 
 args=argParse()
@@ -21,9 +22,9 @@ args=argParse()
 def getAllInfo(object_in,trace_id=None):
 	image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment=[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
 	if trace_id:
-		qry="SELECT image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment FROM eblm_ids_new WHERE object_name='%s' AND n_traces=%d" % (object_in,trace_id)
+		qry="SELECT image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment FROM eblm_ids_new WHERE object_name='%s' AND n_traces=%d AND current_status != 'IGNORE'" % (object_in,trace_id)
 	else:
-		qry="SELECT image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment FROM eblm_ids_new WHERE object_name='%s'" % (object_in)
+		qry="SELECT image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment FROM eblm_ids_new WHERE object_name='%s' AND current_status != 'IGNORE'" % (object_in)
 	print qry
 	with db.cursor() as cur:
 		cur.execute(qry)	
@@ -130,11 +131,12 @@ for i in sorted(object_list.keys()):
 	if args.track and track < args.track:
 		track+=1
 		continue
-	
 	if args.blends == 'nblends':
 		image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,swasp_id,period,epoch,vmag,spectype=getAllInfo(i,1)
 		# check for unmatched objects and skip them
 		if swasp_id=="":
+			continue
+		if args.swasp_id and args.swasp_id != swasp_id:
 			continue
 		runAnalysis(track,i,image_id,object_name,template_image_id,ref_star_name,hjd_mid,utmiddle,n_traces,sky_pa,peak_shift_pix,correlation_height,fwhm_peak_pix,fwhm_peak_kms,relative_velocity_kms,observed_velocity_kms,helio_velocity_kms,comment,swasp_id,period,epoch,vmag,spectype)
 	else:

@@ -4,44 +4,43 @@ Data is stored in the eblm_ids_new table <br/>
 <br/>
 
 Process for reducing IDS spectra: <br/>
-1. Run Spector.py on a nightly basis and extract all the 1D spectra <br/>
-2. Run INT_TimeCorrection.py to fix the times/airmass in the headers. Values from IRAF are a mess. SetJD and SetAirmass disabled in Spector as of 20151006 <br/>
-3. Apply the radial velocity correction using RVcorrect.py<br/>
-4. Run LogSpectraToDB.py on each night's data to log the images to the database. This will be added to later when FXCOR is ran <br/>
-5. Check for common template RV standards across all nights <br/>
-6. Analyse the single stars (n_traces=1) first. Blends need a more careful analysis afterwards (n_traces>1) <br/>
-7. Check that FXCOR settings are coorect (osample etc)
-8. Run FXCOR.py to get RV shifts. FXCOR will log all the values to the database <br/>
-9. Repeat 6 and 7 for the BLENDs.  <br/>
+   1. Read the night log, remove any bad images etc
+   1. Run Spector.py on a nightly basis and extract all the 1D spectra 
+   1. Run INT_TimeCorrection.py to fix the times/airmass in the headers. Values from IRAF are a mess. SetJD and SetAirmass disabled in Spector as of 20151006
+   1. Apply the radial velocity correction using RVcorrect.py
+   1. Run LogSpectraToDB.py on each night's data to log the images to the database. This will be added to later when FXCOR is ran 
+   1. Check for common template RV standards across all nights 
+   1. Analyse the single stars (n_traces=1) first. Blends need a more careful analysis afterwards (n_traces>1) 
+   1. Check that FXCOR settings are coorect (osample etc)
+   1. Run FXCOR.py to get RV shifts. FXCOR will log all the values to the database 
+   1. Repeat 6 and 7 for the BLENDs. 
 <br/>
-In step 3 we log the following to the database for easier analysis later <br/>
-	1. image_id <br/>
-	2. object_name <br/>
-	3. template_image_id <br/>
-	4. ref_star_name <br/>
-	5. hjd_mid <br/>
-	6. utmiddle <br/>
-	7. n_traces <br/>	
+In step 3 we log the following to the database for easier analysis later: <br/>
+   1. image_id 
+   1. object_name 
+   1. template_image_id 
+   1. ref_star_name 
+   1. hjd_mid 
+   1. utmiddle 
+   1. n_traces 	
 <br/>
 Then in step 7 (and 8) we add the following values from FXCOR: <br/>
-	1. peak_shift_pix <br/>
-	2. correlation_height <br/>   
-	3. fwhm_peak_pix <br/>
-	4. fwhm_peak_kms  <br/>       
-	5. relative_velocity_kms  <br/>
-	6. observed_velocity_kms  <br/>
-	7. helio_velocity_kms  <br/> 
-	8. comments <br />
-	9. ccf height <br />
-	10. tonry & davis r-value <br />
+   1. peak_shift_pix 
+   1. correlation_height    
+   1. fwhm_peak_pix 
+   1. fwhm_peak_kms        
+   1. relative_velocity_kms  
+   1. observed_velocity_kms  
+   1. helio_velocity_kms  
+   1. comments 
 <br/>
 
 We also add the following eblm parameters to the database for easier analysis using the EBLMParamsToDB.py script: <br/>
-	1. swasp_id <br/>
-	2. period <br/>   
-	3. epoch <br/>
-	4. Vmag  <br/>       
-	5. paramfit_spec_type  <br/>
+   1. swasp_id 
+   1. period 
+   1. epoch 
+   1. Vmag       
+   1. paramfit_spec_type  
 
 We then cross match the two tables to add the swasp_id to the spectra <br/>
 
