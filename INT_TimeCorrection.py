@@ -7,7 +7,20 @@ from astropy.io import fits
 from astropy.time import Time
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+import argparse as ap
 import glob as g
+
+def argParse():
+	parser=ap.ArgumentParser()
+	parser.add_argument('action',choices=['updatefits','comparefits','updatedb'],help='Update the headers or compare values')
+	return parser.parse_args()
+
+args=argParse()
+
+if args.action == 'updatedb':
+	import pymysql
+	table = 'eblm_ids_new'
+	db = pymysql.connect(host='localhost',db='eblm')
 
 output = ' '
 n=965
@@ -335,12 +348,43 @@ for i in range(0,len(t)):
 	
 	# ok so now we have the real JD-MID (JD_e), HJD-MID and UT-M_e (UTMIDDLE will NOT update correctly!)
 	# update the headers of the spectra
-	iraf.hedit(images=t[i],fields='HJD',value=str('%.8f' % HJD[i]),add='yes',verify='no',show='yes')
-	iraf.hedit(images=t[i],fields='JD_E',value='xxx',add='yes',verify='no',show='yes')
-	iraf.hedit(images=t[i],fields='JD_E',value=str('%.8f' % JD_e[i]),add='yes',verify='no',show='yes')
-	iraf.hedit(images=t[i],fields='UT-M_E',value='xxx',add='yes',verify='no',show='yes')
-	iraf.hedit(images=t[i],fields='UT-M_E',value=str('%s' % (mid_times[i].iso.replace(' ','T'))),add='yes',verify='no',show='yes')
+	if args.action == 'updatefits':
+		iraf.hedit(images=t[i],fields='HJD',value='xxx',add='yes',verify='no',show='yes')
+		iraf.hedit(images=t[i],fields='HJD',value=str('%.8f' % HJD[i]),add='yes',verify='no',show='yes')
+		iraf.hedit(images=t[i],fields='JD_E',value='xxx',add='yes',verify='no',show='yes')
+		iraf.hedit(images=t[i],fields='JD_E',value=str('%.8f' % JD_e[i]),add='yes',verify='no',show='yes')
+		iraf.hedit(images=t[i],fields='UT-M_E',value='xxx',add='yes',verify='no',show='yes')
+		iraf.hedit(images=t[i],fields='UT-M_E',value=str('%s' % (mid_times[i].iso.replace(' ','T'))),add='yes',verify='no',show='yes')
+	elif args.action == 'comparefits':
+		hjd_old=hdr['HJD']
+		jde_old=hdr['JD_E']
+		utme_old=hdr['UT-M_E']
+		print "[HJD] Old: %s --> New: %.6f" % (hjd_old,HJD[i])
+		print "[JD_E] Old: %s --> New: %.6f" % (jde_old,JD_e[i])
+		print "[UT-M_E] Old: %s --> New: %s" % (utme_old,mid_times[i].iso.replace(' ','T'))
+	elif args.action == 'updatedb':
+		qry="SELECT hjd_mid FROM %s WHERE image_id='%s'" % (table,t[i])
+		print qry
+		with db.cursor() as cur:
+			count=cur.execute(qry)
+			if count == 1:
+				qry2="UPDATE %s SET hjd_mid = %.8f WHERE image_id = '%s'" % (table, HJD[i], t[i])
+				print qry2
+				for row in cur:
+					print "%f --> %f" % (row[0],HJD[i])
+				with db.cursor() as cur2:
+					cur2.execute(qry2)
+					db.commit()
+			elif count == 0:
+				print "Image is not logged in %s" % (table)
+			else:
+				print "DUPLICATE ENTRIES IN %s FOR image_id='%s'" % (table,t[i])
+				raise Exception
+	else:
+		print "I'm lost..."
+	print "\n"
 
-# ensure the airmass is ok now that utmiddle etc are fixed	
-iraf.setairmass(images="*.fits", ra="cat-ra", dec="cat-dec", equinox="cat-epoc", st="st", ut="utstart", date="date-obs", exposur="exptime", airmass="airmass", utmiddl="ut-mid", show="yes", update="yes", overrid="yes",mode="ql")	
+if args.action == 'update':		
+	# ensure the airmass is ok now that utmiddle etc are fixed	
+	iraf.setairmass(images="*.fits", ra="cat-ra", dec="cat-dec", equinox="cat-epoc", st="st", ut="utstart", date="date-obs", exposur="exptime", airmass="airmass", utmiddl="ut-mid", show="yes", update="yes", overrid="yes",mode="ql")	
 

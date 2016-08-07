@@ -5,8 +5,10 @@ def ImportPackages():
 	iraf.rv(_doprint=0)
 	iraf.keywpars.setParam('ra','CAT-RA') 
 	iraf.keywpars.setParam('dec','CAT-DEC')
-	iraf.keywpars.setParam('ut','UT')
-	iraf.keywpars.setParam('utmiddl','UT-M_E')
+	# must use UT as UT mid exposure for RV correct or it 
+	# messes up the HJD values by a lot
+	iraf.keywpars.setParam('ut','UT-M_E')
+	iraf.keywpars.setParam('utmiddl','')
 	iraf.keywpars.setParam('exptime','EXPTIME')
 	iraf.keywpars.setParam('epoch','CAT-EPOC')
 	iraf.keywpars.setParam('date_ob','DATE-OBS')
