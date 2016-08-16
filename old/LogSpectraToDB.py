@@ -1,13 +1,14 @@
 # script to wade through spectra and log all the vital info
 # in the database in preparation for FXCOR. 
 # use createTable_EBLM to make the empty table
-
+# TODO: Merge this with Spector!!
+#
 import pymysql
 from astropy.io import fits
 import glob as g
 
 # globals
-db_tab = "eblm_ids_new"
+db_tab = "eblm_ids"
 
 # set up the database
 db = pymysql.connect(host='localhost', db='eblm')

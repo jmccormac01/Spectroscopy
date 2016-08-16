@@ -1,73 +1,16 @@
 """
-########################################################################################
-################################## SPECTOR.py ##########################################
-########################################################################################
-#
-#   INT/IDS Spectral Reduction v2.0: A Script for complete reduction of INT/IDS data
-#
-#                               James McCormac
-#
-#   Before running Spector:
-#       -   Remove all files that should not be included in reduction
-#           i.e. bad flats, data from other central wavelengths or gratings etc.
-#           Place all this data in a folder called 'junk'. Use *.int logfile to
-#           help weed out unwanted files
-#       -   Adjust the settings in the **EDIT HERE** section below
-#
-#   Assumptions:
-#       -   This code was written for a particular observing strategy:
-#               Acquire, Arc, Science, Arc, REPEAT...
-#           Therefore the script is looking for this structure in the data when matching 
-#           arcs to spectra. This can be easily changed by modifying the relevant section
-#
-#   What Spector does:
-#       -   Prepares the working environment, making copies of original data
-#       -   Loads IRAF
-#       -   Strips multi extension fits to single extension
-#       -   Renames files for easier viewing:
-#               i_* = integration (spectra)
-#               a_* = arc
-#               b_* = bias
-#               f_* = flat
-#       -   Debiases and flat field corrects the data
-#       -   Tidies up calibration frames into 'calibs' folder
-#       -   Trims the spectra based on INT's heavily vignetted region, see TRIMSEC below
-#       -   Interactive spectral analysis with KPNOSLIT in IRAF
-#       -   Normalises the spectra
-#       -   Tidies up working directory after reductions are finished
-#
-#   What Spector does not do:
-#       -   Flux calibration
-#
-#   What you will end up with:
-#       -   A set of reduced, wavelength calibrated, normalised 1D spectra with the
-#           byproducts from each step located in subdirectories within the 'reduced'
-#           folder.
-#
-#   Who to annoy if you have questions:
-#       jmccormac001@gmail.com
-#
-# Changes:
-#   2015-10-06: Removed setdJD and setAirmass as they were deeply broken!
-#
+Spector - A tool for extracting 1D spectra from INT/IDS
 """
 import sys
 import os
-import re
 import time
-import argparse as ap
-from datetime import (
-    datetime,
-    timedelta
-    )
-from collections import defaultdict
+import glob as g
 import numpy as np
 from ccdproc import (
     CCDData,
     ImageFileCollection,
     combine,
     subtract_bias,
-    subtract_dark,
     flat_correct,
     trim_image
     )
@@ -78,15 +21,17 @@ from astropy.coordinates import (
     EarthLocation,
     SkyCoord
     )
-import matplotlib.pyplot as plt
-import glob as g
-#import pyds9
 
 # set up some exceptions to work cross Python2 and 3
 try:
     FileNotFoundError
 except NameError:
     FileNotFoundError = IOError
+
+# pylint: disable=invalid-name
+# pylint: disable=redefined-builtin
+# pylint: disable=no-member
+# pylint: redefined-outer-name
 
 #################################
 ########### EDIT HERE ###########
@@ -111,13 +56,12 @@ RA_KEYWORD = 'CAT-RA'
 DEC_KEYWORD = 'CAT-DEC'
 
 # Observatory
-# this fails when there is no internet, how stupid!
-# do it manually so I can work on the bus
-#OBSERVATORY = EarthLocation.of_site('Roque de los Muchachos')
 olat = 28.+(45./60.)-(37./3600.)
 olon = -17.-(52./60.)-(46./3600.)
 elev = 2332.
-OBSERVATORY = EarthLocation(lat=olat*u.deg,lon=olon*u.deg,height=elev*u.m)
+OBSERVATORY = EarthLocation(lat=olat*u.deg, lon=olon*u.deg, height=elev*u.m)
+# this below is useful but fails when there is no internet
+# OBSERVATORY = EarthLocation.of_site('Roque de los Muchachos')
 
 #################################
 
@@ -125,9 +69,9 @@ def makeDirs():
     """
     Make directories for original and reduced data
     """
-    if os.path.isdir('original') == False:
+    if not os.path.isdir('original'):
         os.mkdir('original')
-    if os.path.isdir('reduced') == False:
+    if not os.path.isdir('reduced'):
         os.mkdir('reduced')
 
 def copyFiles():
@@ -196,7 +140,7 @@ def makeMasterBias(images):
             master_bias.write('master_bias.fits', clobber=True)
             return master_bias
         except IndexError:
-            return  None
+            return None
 
 def makeMasterFlat(images, master_bias):
     """
@@ -270,9 +214,9 @@ def correctData(filename, master_bias, master_flat, filetype):
             ra = hdr[RA_KEYWORD]
             dec = hdr[DEC_KEYWORD]
             time_start = Time('{}T{}'.format(dateobs, utstart),
-                                             scale='utc',
-                                             format='isot',
-                                             location=OBSERVATORY)
+                              scale='utc',
+                              format='isot',
+                              location=OBSERVATORY)
             # correct to mid exposure time
             jd_mid = time_start + half_exptime*u.second
             ltt_bary, ltt_helio = getLightTravelTimes(ra, dec, jd_mid)
@@ -281,6 +225,7 @@ def correctData(filename, master_bias, master_flat, filetype):
             hdr['BJD-MID'] = time_bary.jd
             hdr['HJD-MID'] = time_helio.jd
             hdr['JD-MID'] = jd_mid.jd
+            hdr['UT-MID'] = jd_mid.isot
     ccd = CCDData.read(filename, unit=u.adu)
     if master_bias:
         ccd = subtract_bias(ccd, master_bias)
@@ -297,7 +242,7 @@ def correctData(filename, master_bias, master_flat, filetype):
     if isinstance(ccd.data[0][0], np.uint16):
         ccd.data = ccd.data.astype(np.float64)
     # trim the data
-    ccd_trimmed = trim_image(ccd[1000:3001,:])
+    ccd_trimmed = trim_image(ccd[1000:3001, :])
     # write out the trimmed file and the updated header
     #ccd_trimmed.write(filename, hdr, clobber=True)
     trimmed_filename = '{}_t.fits'.format(filename.split('.')[0])
@@ -325,11 +270,11 @@ def extractSpectra():
     get the most accurate wavelength solution
 
     TODO: Finish docstring
-          Add method of using super arc for inital 
+          Add method of using super arc for inital
           identify
     """
     # load IRAF from the location of the login.cl file
-    here=os.getcwd()
+    here = os.getcwd()
     os.chdir(loginCl_location)
     from pyraf import iraf
     os.chdir(here)
@@ -390,22 +335,26 @@ def extractSpectra():
     # TODO
 
     # make reference arc for reidentify
-    refarc=None
-    for i in range(0,len(templist)):
+    refarc = None
+    for i in range(0, len(templist)):
         hdulist = fits.open(templist[i])
         prihdr = hdulist[0].header
         target_id = prihdr['CAT-NAME']
+        spectrum_id = int(templist[i].split('_')[2].split('r')[1])
         # extract the object spectrum
         print("Extracting spectrum of {} from image {}".format(target_id, templist[i]))
         print("Check aperture and background. Change if required")
         print("AP: m = mark aperture, d = delete aperture")
         print("SKY: s = mark sky, t = delete sky, f = refit")
         print("q = continue")
-        iraf.apall(input=image)
+        iraf.apall(input=templist[i])
         print("Spectrum extracted!")
         # find the arcs either side of the object
-        arc1 = "a_s_r{0:d}_t.fits".format(int(templist[i].split('_')[2].split('r')[1])-1)
-        arc2 = "a_s_r{0:d}_t.fits".format(int(templist[i].split('_')[2].split('r')[1])+1)
+        arclist = []
+        arc1 = "a_s_r{0:d}_t.fits".format(spectrum_id-1)
+        arc2 = "a_s_r{0:d}_t.fits".format(spectrum_id+1)
+        arc1_out = "a_s_r{0:d}_t.ms.fits".format(spectrum_id-1)
+        arc2_out = "a_s_r{0:d}_t.ms.fits".format(spectrum_id+1)
         # predict the arc names
         print("\nPredicting arcs names...")
         print("Arc1: {}".format(arc1))
@@ -414,27 +363,31 @@ def extractSpectra():
         reffile = templist[i].split('.fits')[0]
         # extract the arcs
         print("\nExtracting arcs under the same conditions...")
-        iraf.apall(input=arc1,
-                   reference=reffile,
-                   recente="no",
-                   trace="no",
-                   backgro="no",
-                   interac="no")
-        print("Arc1 extracted")
-        iraf.apall(input=arc2,
-                   reference=reffile,
-                   recente="no",
-                   trace="no",
-                   backgro="no",
-                   interac="no")
-        print("Arc2 extracted")
+        if os.path.exists(arc1):
+            iraf.apall(input=arc1,
+                       reference=reffile,
+                       recente="no",
+                       trace="no",
+                       backgro="no",
+                       interac="no")
+            print("Arc1 {} extracted".format(arc1))
+            arclist.append(arc1_out)
+        else:
+            print("\n\nArc1 {} FILE NOT FOUND\n\n".format(arc1))
+        if os.path.exists(arc2):
+            iraf.apall(input=arc2,
+                       reference=reffile,
+                       recente="no",
+                       trace="no",
+                       backgro="no",
+                       interac="no")
+            print("Arc2 {} extracted".format(arc2))
+            arclist.append(arc2_out)
+        else:
+            print("\n\nArc2 {} FILE NOT FOUND\n\n".format(arc2))
         # get a list of the extracted arcs and objects
-        templist2 = g.glob('a_s*.ms.fits')[-2:]
-        templist3 = g.glob('i_s*.ms.fits')[-1]
-        print("\nArcs extracted to:")
-        print(templist2[0])
-        print(templist2[1])
-        if i==0:
+        spectrum_out = "i_s_r{0:d}_t.ms.fits".format(spectrum_id)
+        if i == 0:
             print("\nIdentify arc lines:")
             print("Enter the following in the splot window")
             print("\t:thres 500")
@@ -446,43 +399,40 @@ def extractSpectra():
             print("Press 'f' to fit the dispersion correction")
             print("Use 'd' to remove bad points, 'f' to refit")
             print("'q' from fit, then 'q' from identify to continue\n")
-            refarc = templist2[0]
+            refarc = arclist[0]
             iraf.identify(images=refarc, coordlist=lineList_location)
-            iraf.reidentify(reference=refarc, images=templist2[1])
-        if i>0:
-            print ("\nReidentifying arclines from {}".format(refarc))
-            iraf.reidentify(reference=refarc, images=templist2[0])
-            iraf.reidentify(reference=refarc, images=templist2[1])
+            if len(arclist) > 1:
+                iraf.reidentify(reference=refarc, images=arclist[1])
+        if i > 0:
+            print("\nReidentifying arclines from {}".format(refarc))
+            iraf.reidentify(reference=refarc, images=arclist[0])
+            if len(arclist) > 1:
+                iraf.reidentify(reference=refarc, images=arclist[1])
         # add the refspec keywords to the image header for dispcor
-        refspec1 = "{} 0.5".format(templist2[0].split(".fits")[0])
-        refspec2 = "{} 0.5".format(templist2[1].split(".fits")[0])
-        print("\nREFSPEC1: {}".format(refspec1))
-        print("REFSPEC2: {}".format(refspec2))
-        iraf.hedit(images=templist3,
-                   fields="REFSPEC1",
-                   value=refspec1,
-                   add="yes",
-                   verify="no",
-                   show="yes")
-        iraf.hedit(images=templist3,
-                   fields="REFSPEC2",
-                   value=refspec2,
-                   add="yes",
-                   verify="no",
-                   show="yes")
+        # refspec_factor tells IRAF how to interpolate the arcs
+        refspec_factor = round((1./len(arclist)), 1)
+        for i in range(0, len(arclist)):
+            refspec = "{} {}".format(arclist[i].split(".fits")[0], refspec_factor)
+            print("REFSPEC{}: {}".format(i+1, refspec))
+            iraf.hedit(images=spectrum_out,
+                       fields="REFSPEC{}".format(i+1),
+                       value=refspec,
+                       add="yes",
+                       verify="no",
+                       show="yes")
         print("Headers updated!\n")
         # apply the dispersion correction
         print("Applying the dispersion correction")
-        iraf.dispcor(input=templist3,
-                     output=templist3,
+        iraf.dispcor(input=spectrum_out,
+                     output=spectrum_out,
                      lineari="yes",
                      databas="database",
                      table="")
         print("Correction applied!")
         # normalize the spectrum using continuum
-        normspec = "{}n.ms.fits".format(templist3.split('.ms')[0])
-        iraf.continuum(input=templist3,
-                       output=normspec,
+        normspec_out = "{}n.ms.fits".format(spectrum_out.split('.ms')[0])
+        iraf.continuum(input=spectrum_out,
+                       output=normspec_out,
                        logfile="logfile",
                        interac="yes",
                        functio="spline3",
@@ -495,40 +445,74 @@ def roundUpSpectra():
     """
     Gather up reduced spectra
     """
-    if os.path.exists('spectra_r') == False:
+    if not os.path.exists('spectra_r'):
         os.mkdir('spectra_r')
     for i in g.glob('*_tn.ms.fits'):
         os.system('mv {} spectra_r/'.format(i))
 
-def roundUpArcs():
+def eraseIntermediateProducts():
     """
-    Gather up all the reduced arcs and put them 
-    somewhere out of the way
+    Delete all the partial steps, I never look at this crap
+    and always start from scratch if there is an issue.
+
+    Waste of disc space
     """
-    templist=g.glob('i*t.ms.fits')
-    templist2=g.glob('i*t.fits')
-    templist3=g.glob('a*t.ms.fits')
-    templist4=g.glob('a*t.fits')
-    if os.path.exists('unnormalized') == False:
-        os.mkdir('unnormalized')
-    for i in range(0,len(templist)):
-        f1="unnormalized/"+str(templist[i])
-        os.rename(templist[i], f1)
-    for i in range(0,len(templist2)):
-        f2="unnormalized/"+str(templist2[i])
-        os.rename(templist2[i], f2)
-    for i in range(0,len(templist3)):
-        f3="unnormalized/"+str(templist3[i])
-        os.rename(templist3[i], f3)
-    for i in range(0,len(templist4)):
-        f4="unnormalized/"+str(templist4[i])
-        os.rename(templist4[i], f4)
-    return 0
+    for i in g.glob('i*.fits'):
+        os.system('rm {}'.format(i))
+    for i in g.glob('a*.fits'):
+        os.system('rm {}'.format(i))
+
+def logSpectraToDb():
+    """
+    Merged from LogSpectraToDB.py
+    """
+    os.chdir('spectra_r/')
+    # get the list of spectra
+    t = g.glob('*_tn.ms.fits')
+    # find the reference spectrum
+    obj = []
+    for i in t:
+        obj.append(fits.open(i)[0].header['OBJECT'])
+    # loop over spectra and log them
+    for i in t:
+        h = fits.open(i)
+        hdr = h[0].header
+        d = h[0].data
+        image_id = i
+        object_name = hdr['OBJECT']
+        hjd_mid = hdr['HJD-MID']
+        bjd_mid = hdr['BJD-MID']
+        jd_mid = hdr['JD-MID']
+        utmiddle = hdr['UT-MID']
+        pa = hdr['ROTSKYPA']
+        n_traces = d.shape[1]
+        qry = """INSERT INTO eblm_ids
+                (image_id,
+                object_name,
+                bjd_mid,
+                hjd_mid,
+                jd_mid,
+                utmiddle,
+                n_traces,
+                sky_pa)
+                VALUES
+                ('{}', '{}', {}, {}, {}, '{}', {}, {})
+                """.format(image_id,
+                           object_name,
+                           bjd_mid,
+                           hjd_mid,
+                           jd_mid,
+                           utmiddle.replace("T", " "),
+                           n_traces,
+                           pa)
+        print(qry)
+        cur.execute(qry)
+        db.commit()
 
 if __name__ == '__main__':
-    print '\n\n---------------------------------------------------------'
-    print '------------- Spectroscopy by Spector.py ----------------'
-    print '---------------------------------------------------------\n'
+    print('\n\n---------------------------------------------------------')
+    print('------------- Spectroscopy by Spector.py ----------------')
+    print('---------------------------------------------------------\n')
 
     junk_yn = raw_input("Has the junk been removed from current folder? (y/n): ")
     if junk_yn != 'y':
@@ -558,18 +542,8 @@ if __name__ == '__main__':
     extractSpectra()
     # round up the reduced spectra
     roundUpSpectra()
-
-    cont = 0
-    if cont > 0:
-
-        print "Round up arcs?"
-        rua_yn = raw_input("(e.g y): ")
-        if str(rua_yn) == 'y':
-            # round up files lift by the reduction into one folder
-            print "Putting reduction left overs in 'unnormalized'..."
-            time.sleep(1)
-            roundedupa=RoundUpArcs()
-            if roundedupa != 0:
-                print "Problem rounding up the reduction left overs, exiting!"
-                exit()
+    # remove all the intermediate data products
+    eraseIntermediateProducts()
+    # log the spectra to the database
+    logSpectraToDb()
 
