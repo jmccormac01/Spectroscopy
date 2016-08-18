@@ -50,26 +50,26 @@ Schema for database table
 
 ```
 create table eblm\_ids (
-image\_id                      varchar(40) not null primary key,
-swasp\_id                      varchar(40),
-object\_name                   varchar(20) not null,
-night                          date,
-utmiddle                       datetime,
-hjd\_mid                       double,
-bjd\_mid                       double,
-jd\_mid                        double,
-n\_traces                      int(2),
-sky\_pa                        double,
-ccf\_height                    double,
-ccf\_fwhm                      double,
-atomic\_velocity               double,
-atomic\_velocity\_err          double,
-telluric\_velocity             double,
-telluric\_velocity\_err        double,
-barycentric\_velocity\_iSpec   double,
-barycentric\_velocity\_exo     double,
-comment                        varchar(40),
-analyse                        tinyint(1)
+image_id                      varchar(40) not null primary key,
+swasp_id                      varchar(40),
+object_name                   varchar(20) not null,
+night                         date,
+utmiddle                      datetime,
+hjd_mid                       double,
+bjd_mid                       double,
+jd_mid                        double,
+n_traces                      int(2),
+sky_pa                        double,
+ccf_height                    double,
+ccf_fwhm                      double,
+atomic_velocity               double,
+atomic_velocity_err           double,
+telluric_velocity             double,
+telluric_velocity_err         double,
+barycentric_velocity_iSpec    double,
+barycentric_velocity_exo      double,
+comment                       varchar(40),
+analyse                       tinyint(1)
 );
 ```
 
