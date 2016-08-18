@@ -39,17 +39,16 @@ Usage
 *What you will end up with:*
    1.  A set of reduced, wavelength calibrated, normalised 1D spectra.
 
-Steps for reducing IDS spectra
-------------------------------
+Steps for reducing and analysing IDS spectra
+--------------------------------------------
 
    1. Run Spector to extract the wavelength calibrated 1D spectra
-   1. Log the spectra to the database with LogSpectraToDB.py
    1. Add the target parameters to the database if required using EBLMParamsToDB.py
-   1. Collect all spectra for a given target and perform RV analysis with iSpec
 
 Schema for database table
 -------------------------
 
+```
 create table eblm\_ids (
 image\_id                      varchar(40) not null primary key,
 swasp\_id                      varchar(40),
@@ -72,6 +71,7 @@ barycentric\_velocity\_exo     double,
 comment                        varchar(40),
 analyse                        tinyint(1)
 );
+```
 
 Gathering Spectra for Analysis with iSpec
 -----------------------------------------
@@ -110,6 +110,9 @@ If Q1 and Q2 and dRV > 25 km/s, then flag for phase coverage
 If Q1 and Q2 and dRV < 25 km/s, then flag for phase coverage-stabilized
 
 Ignore all SB2, IGNORE, EB, BEB objects
+
+Dealing with blends
+-------------------
 
 Need to determine a way to treat blends properly
 
