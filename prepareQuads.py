@@ -1,7 +1,8 @@
 """
 Prepare quads for CAFE/IDS obs
 
-To do:
+TODO:
+
 """
 import math
 import sys
@@ -10,19 +11,21 @@ from collections import defaultdict
 import pymysql
 import ephem
 from astropy.time import Time
+from astropy.coordinates import SkyCoord
 import astropy.units as u
 import numpy as np
 from numpy.polynomial import Polynomial as P
 
 # connect to database
-db = pymysql.connect(host='localhost', db='eblm')
+db = pymysql.connect(host='localhost', db='eblm', password='mysqlpassword')
 
 def argParse():
     description = "Code to calculate QUADS for CAFE/IDS objects"
     status_choices = ["CONTINUE-CAFE",
                       "CONTINUE-STABILIZED",
                       "CONTINUE",
-                      "OBSERVE"]
+                      "OBSERVE",
+                      "PHASE_COVERAGE"]
     instruments = ['CAFE', 'IDS']
     parser = ap.ArgumentParser(description=description)
     parser.add_argument('instrument',
@@ -36,19 +39,25 @@ def argParse():
     parser.add_argument('--snr', help='Target SNR for obs', type=int, default=30)
     return parser.parse_args()
 
+# parse the command line
+args = argParse()
 # observatory set up
 telescope = ephem.Observer()
 if args.instrument == 'CAFE':
     telescope.lat = str(37. + (13./60.) + (25./3600.))
     telescope.lon = str(-2. - (32./60.) - (46./3600.))
     telescope.elev = 2168
+    telescope.horizon = '-18'
 else:
     telescope.lon=str(-17.-(52./60.))
     telescope.lat=str(28.+(40./60.))
     telescope.elev=2326
+    telescope.horizon = '-12'
+telescope.pressure = 750
 # some observing constraints
 MOON_ANGLE_LIMIT= 30
-ELEVATION_LIMIT = 30
+ELEVATION_LIMIT = 40
+DECLINATION_LIMIT = -20
 
 def Deg(l):
     if float(l[0]) >= 0:
@@ -80,7 +89,6 @@ def getCafeExptime(swasp_id, vmag):
         coeffs_store[i]=coeffs
         tn=np.arange(30,3060,60)
         besty=np.polyval(coeffs,tn)
-
     diff=V-vmag
     n=np.where(abs(diff)==min(abs(diff)))[0][0]
     p=P.fit(t,snr[V[n]],2)
@@ -89,27 +97,20 @@ def getCafeExptime(swasp_id, vmag):
         predicted=t1.real
     else:
         predicted=t2.real
-
     print('Predicted exptime {0:.2f}'.format(predicted))
-
     # round to the nearest 60
     predicted = math.ceil(predicted/60)*60
     print('Rounding up to nearest 60s {0:d}'.format(predicted))
-
     # check for texp>2700, scale to right number of
     # spectra to get required SNR
     if predicted > 2700:
         print('Predicted time > 2700s, looking for good combo of spectra')
-
         snr_max = snr[V[n]][-1]
         print('SNR_max @ 2700 = {0:.2f}'.format(snr_max))
-
         n_spectra = (args.snr/snr[V[n]][-1])**2
         print('This needs {0:.2f} spectra @ 2700'. format(n_spectra))
-
         n_spectra = math.ceil(n_spectra)
         print('Rounding up to next integer n_spectra = {0:d}'.format(n_spectra))
-
         # now work out the best exptime to use to combine 
         # n_spectra spectra to get the desired args.snr
         target_single_spectra_snr = args.snr/math.sqrt(n_spectra)
@@ -125,12 +126,22 @@ def getCafeExptime(swasp_id, vmag):
         n_spectra=1
     else:
         n_spectra=1
-
-    print("%s %.2f %d x %.2fs" % (swasp_id,vmag,n_spectra,predicted))
+    print("{} {.2f} {d} x {.2f}s".format(swasp_id,vmag,n_spectra,predicted))
     return n_spectra, predicted
 
-def getIdsExptime():
-    pass
+def getIdsExptime(mag):
+    """
+    Below are exposure times to give SNR ~50-60
+    with IDS assuming bright time, airmass 1.2,
+    slit width 1.4 and seeing 1.2'' (H1800V +
+    6500A)
+    """
+    mags = np.arange(8.0, 14.0, 0.5)
+    exptimes = np.array([8, 12, 20, 30, 50, 80, 120,
+                         180, 300, 500, 700, 1200])
+    diff = abs(mags - mag)
+    n = np.where(diff == min(diff))[0][-1]
+    return exptimes[n]
 
 def getObjects(status):
     objects = {}
@@ -148,36 +159,52 @@ def getObjects(status):
             objects[row[0]] = (row[1], row[2]+2450000, row[3], row[4], row[5], row[6])
     return objects
 
+def getObjectsForPhaseCoverage():
+    """
+    For these objects we don't care about the time
+
+    Just output them all with their exptimes and mags
+    """
+    qry = """
+        SELECT swasp_id, Vmag
+        FROM eblm_parameters
+        WHERE current_status = 'PHASE_COVERAGE'
+        """
+    with db.cursor() as cur:
+        cur.execute(qry)
+        print('swasp_id', 'V mag', 'exptime')
+        for row in cur:
+            swasp_id = row[0]
+            mag = round(float(row[1]),2)
+            exptime = getIdsExptime(mag)
+            print(swasp_id, mag, exptime)
+
 if __name__ == '__main__':
-    args = argParse()
     if len(args.night1.split('-')) != 3 or len(args.night2.split('-')) != 3:
         print('Dates must have YYYY-MM-DD format')
         sys.exit(1)
-
+    if args.status_flag == 'PHASE_COVERAGE':
+        getObjectsForPhaseCoverage()
+        sys.exit(0)
     JD1 = (Time(args.night1, format='isot', scale='utc', in_subfmt='date') + 0.5*u.day).jd
     JD2 = (Time(args.night2, format='isot', scale='utc', in_subfmt='date') + 1.5*u.day).jd
-
     # dictionary to hold the plan
     obs = {}
-
     # list to hold quads
     Q1_sched, Q2_sched = [],[]
-
     # get the objects from the database
     objects = getObjects(args.status_flag)
     for obj in objects:
         Epoch = objects[obj][1]
         Period = objects[obj][0]
         Vmag = objects[obj][2]
-
         # get expected exposure time for args.snr
         if args.instrument == 'CAFE':
             n_spectra, exptime = getCafeExptime(obj, Vmag)
-        # fluff IDS for now
+        # for IDS we just use the 50-60 SNR values from always
         else:
             n_spectra = 1
-            exptime = 900
-
+            exptime = getIdsExptime(Vmag)
         # generate an ephem star
         ra = "{0:s}:{1:s}:{2:s}".format(obj[7:9],obj[9:11],obj[11:16])
         dec = "{0:s}:{1:s}:{2:s}".format(obj[16:19],obj[19:21],obj[21:25])
@@ -186,12 +213,14 @@ if __name__ == '__main__':
         star._dec=ephem.degrees(dec)
         print(obj, ra, dec,  objects[obj][0], objects[obj][1])
 
+        # using astropy SkyCoord to cut on declination
+        skycoord = SkyCoord(ra, dec, unit=(u.hourangle, u.degree), frame='icrs')
+        if skycoord.dec.deg < DECLINATION_LIMIT:
+            print('Target {} too low, skipping...'.format(obj))
+            continue
+
         # generate list of quads
-        # can do this better. cycle the 
-        # epoch forward or backwards until the E before the run
-        # then simply scale it through the run from there
-        # no need for a billion epochs for nothing... fix later
-        nepoch = 20000
+        nepoch = 30000
         ec = np.empty(nepoch)
         for j in range(0, nepoch):
             ec[j] = Epoch + j*Period
@@ -199,7 +228,6 @@ if __name__ == '__main__':
         if min(abs(diff)) > Period:
             print('Add more epochs, quitting...')
             sys.exit()
-
         n=np.where(np.abs(diff) == np.min(np.abs(diff)))
         # count from here n_periods until after JD2
         n_periods=int((JD2-ec[n[0][0]])/Period)+1
@@ -243,7 +271,7 @@ if __name__ == '__main__':
                     if ms_q1 >= MOON_ANGLE_LIMIT and alt_q1 > ELEVATION_LIMIT:
                         # if the pass check we are withing twilights
                         if Q1rt[k].jd > float(ephem.julian_date(e_twi1)) and Q1rt[k].jd < float(ephem.julian_date(m_twi1)):
-                            obs[Q1rt[k].iso] = "Q1 {0:s} alt={1:.2f} V={2:.2f} Texp={3:d}x{4:d} MoonSep={5:03d} MoonIll={6:d}%".format(obj, alt_q1, Vmag, exptime, n_spectra, int(ms_q1), int(phase_q1))
+                            obs[(Q1rt[k]-((exptime/2.)*u.second)).iso] = "Q1 {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(obj, int(alt_q1), round(Vmag, 1), exptime, n_spectra, int(ms_q1), int(phase_q1))
                             # append this object to a Q1 list
                             Q1_sched.append(obj)
         else:
@@ -273,7 +301,7 @@ if __name__ == '__main__':
                     if ms_q2 >= MOON_ANGLE_LIMIT and alt_q2 > ELEVATION_LIMIT:
                         # if the pass check we are withing twilights
                         if Q2rt[k].jd > float(ephem.julian_date(e_twi1)) and Q2rt[k].jd < float(ephem.julian_date(m_twi1)):
-                            obs[Q2rt[k].iso] = "Q2 {0:s} alt={1:.2f} V={2:.2f} Texp={3:d}x{4:d} MoonSep={5:03d} MoonIll={6:d}%".format(obj, alt_q2, Vmag, exptime, n_spectra, int(ms_q2), int(phase_q2))
+                            obs[(Q2rt[k]-((exptime/2.)*u.second)).iso] = "Q2 {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(obj, int(alt_q2), round(Vmag, 1), exptime, n_spectra, int(ms_q2), int(phase_q2))
                             Q2_sched.append(obj)
 
     # print the final plan
