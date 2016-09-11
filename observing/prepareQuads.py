@@ -99,7 +99,7 @@ def getCafeExptime(swasp_id, vmag):
         predicted=t2.real
     print('Predicted exptime {0:.2f}'.format(predicted))
     # round to the nearest 60
-    predicted = math.ceil(predicted/60)*60
+    predicted = int(math.ceil(predicted/60))*60
     print('Rounding up to nearest 60s {0:d}'.format(predicted))
     # check for texp>2700, scale to right number of
     # spectra to get required SNR
@@ -126,7 +126,7 @@ def getCafeExptime(swasp_id, vmag):
         n_spectra=1
     else:
         n_spectra=1
-    print("{} {.2f} {d} x {.2f}s".format(swasp_id,vmag,n_spectra,predicted))
+    print("{0:s} {1:.2f} {2:d} x {3:.2f}s".format(swasp_id,vmag,n_spectra,predicted))
     return n_spectra, predicted
 
 def getIdsExptime(mag):

@@ -32,6 +32,7 @@ Usage
    1. Normalises the spectra
    1. Tidies up working directory after reductions are finished
    1. Removes all intermediate data products to save disc space
+   1. Logs spectra information to the databse
 
 *What Spector does not do:*
    1. Flux calibration
@@ -43,13 +44,14 @@ Steps for reducing and analysing IDS spectra
 --------------------------------------------
 
    1. Run Spector to extract the wavelength calibrated 1D spectra
-   1. Add the target parameters to the database if required using EBLMParamsToDB.py
+   1. Tidy the spectra into one place using XXXX.py
+   1. 
 
 Schema for database table
 -------------------------
 
 ```
-create table eblm\_ids (
+create table eblm_ids (
 image_id                      varchar(40) not null primary key,
 swasp_id                      varchar(40),
 object_name                   varchar(20) not null,
