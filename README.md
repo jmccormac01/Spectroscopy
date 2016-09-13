@@ -40,41 +40,6 @@ Usage
 *What you will end up with:*
    1.  A set of reduced, wavelength calibrated, normalised 1D spectra.
 
-Steps for reducing and analysing IDS spectra
---------------------------------------------
-
-   1. Run Spector to extract the wavelength calibrated 1D spectra
-   1. Tidy the spectra into one place using XXXX.py
-   1. 
-
-Schema for database table
--------------------------
-
-```
-create table eblm_ids (
-image_id                      varchar(40) not null primary key,
-swasp_id                      varchar(40),
-object_name                   varchar(20) not null,
-night                         date,
-utmiddle                      datetime,
-hjd_mid                       double,
-bjd_mid                       double,
-jd_mid                        double,
-n_traces                      int(2),
-sky_pa                        double,
-ccf_height                    double,
-ccf_fwhm                      double,
-atomic_velocity               double,
-atomic_velocity_err           double,
-telluric_velocity             double,
-telluric_velocity_err         double,
-barycentric_velocity_iSpec    double,
-barycentric_velocity_exo      double,
-comment                       varchar(40),
-analyse                       tinyint(1)
-);
-```
-
 Gathering Spectra for Analysis with iSpec
 -----------------------------------------
 
@@ -118,6 +83,33 @@ Dealing with blends
 
 Need to determine a way to treat blends properly
 
+Schema for database table
+-------------------------
+
+```
+create table eblm_ids (
+image_id                      varchar(40) not null primary key,
+swasp_id                      varchar(40),
+object_name                   varchar(20) not null,
+night                         date,
+utmiddle                      datetime,
+hjd_mid                       double,
+bjd_mid                       double,
+jd_mid                        double,
+n_traces                      int(2),
+sky_pa                        double,
+ccf_height                    double,
+ccf_fwhm                      double,
+atomic_velocity               double,
+atomic_velocity_err           double,
+telluric_velocity             double,
+telluric_velocity_err         double,
+barycentric_velocity_iSpec    double,
+barycentric_velocity_exo      double,
+comment                       varchar(40),
+analyse                       tinyint(1)
+);
+```
 
 Contributors
 ------------

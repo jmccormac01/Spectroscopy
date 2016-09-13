@@ -1,10 +1,13 @@
 """
 Spector - A tool for extracting 1D spectra from INT/IDS
+
+TODO:
 """
 import sys
 import os
 import time
 import glob as g
+import argparse as ap
 import numpy as np
 from ccdproc import (
     CCDData,
@@ -21,6 +24,7 @@ from astropy.coordinates import (
     EarthLocation,
     SkyCoord
     )
+import pymysql
 
 # set up some exceptions to work cross Python2 and 3
 try:
@@ -64,6 +68,16 @@ OBSERVATORY = EarthLocation(lat=olat*u.deg, lon=olon*u.deg, height=elev*u.m)
 # OBSERVATORY = EarthLocation.of_site('Roque de los Muchachos')
 
 #################################
+
+def argParse():
+    parser = ap.ArgumentParser()
+    parser.add_argument('--ready',
+                        help='set this to show all the junk is removed',
+                        action='store_true')
+    parser.add_argument('--log_only',
+                        help='use this to log spectra to db only',
+                        action='store_true')
+    return parser.parse_args()
 
 def makeDirs():
     """
@@ -342,11 +356,11 @@ def extractSpectra():
         target_id = prihdr['CAT-NAME']
         spectrum_id = int(templist[i].split('_')[2].split('r')[1])
         # extract the object spectrum
-        print("Extracting spectrum of {} from image {}".format(target_id, templist[i]))
-        print("Check aperture and background. Change if required")
-        print("AP: m = mark aperture, d = delete aperture")
-        print("SKY: s = mark sky, t = delete sky, f = refit")
-        print("q = continue")
+        print("[{}/{}] Extracting spectrum of {} from image {}".format(i+1, len(templist), target_id, templist[i]))
+        print("[{}/{}] Check aperture and background. Change if required".format(i+1, len(templist)))
+        print("[{}/{}] AP: m = mark aperture, d = delete aperture".format(i+1, len(templist)))
+        print("[{}/{}] SKY: s = mark sky, t = delete sky, f = refit".format(i+1, len(templist)))
+        print("[{}/{}] q = continue".format(i+1, len(templist)))
         iraf.apall(input=templist[i])
         print("Spectrum extracted!")
         # find the arcs either side of the object
@@ -466,13 +480,10 @@ def logSpectraToDb():
     """
     Merged from LogSpectraToDB.py
     """
+    db = pymysql.connect(host='localhost', db='eblm', password='mysqlpassword')
     os.chdir('spectra_r/')
     # get the list of spectra
     t = g.glob('*_tn.ms.fits')
-    # find the reference spectrum
-    obj = []
-    for i in t:
-        obj.append(fits.open(i)[0].header['OBJECT'])
     # loop over spectra and log them
     for i in t:
         h = fits.open(i)
@@ -506,44 +517,44 @@ def logSpectraToDb():
                            n_traces,
                            pa)
         print(qry)
-        cur.execute(qry)
-        db.commit()
+        with db.cursor() as cur:
+            cur.execute(qry)
+            db.commit()
 
 if __name__ == '__main__':
     print('\n\n---------------------------------------------------------')
     print('------------- Spectroscopy by Spector.py ----------------')
     print('---------------------------------------------------------\n')
-
-    junk_yn = raw_input("Has the junk been removed from current folder? (y/n): ")
-    if junk_yn != 'y':
-        print('Remove all files that should not be analysed, then restart')
-        sys.exit(1)
-
-    # make a local backup copy of the data
-    copyFiles()
-    # get a list of images in current directory
-    images = getImageList()
-    # rename the images to make them easier to read
-    renameFiles(images)
-    # get new filenames
-    images = getImageList()
-    # make a master bias
-    master_bias = makeMasterBias(images)
-    # make a master flat
-    master_flat = makeMasterFlat(images, master_bias)
-    # correct the arcs
-    for filename in images.files_filtered(imagetyp=ARC_KEYWORD):
-        correctData(filename, master_bias, master_flat, 'arc')
-    # correct the science spectra
-    for filename in images.files_filtered(imagetyp=SCIENCE_KEYWORD):
-        correctData(filename, master_bias, master_flat, 'science')
-    cleanCalibs()
-    # extract wavelength calibrated and continuum normalised spectra
-    extractSpectra()
-    # round up the reduced spectra
-    roundUpSpectra()
-    # remove all the intermediate data products
-    eraseIntermediateProducts()
-    # log the spectra to the database
-    logSpectraToDb()
-
+    # get command line args
+    args = argParse()
+    if args.ready:
+        if not args.log_only:
+            # make a local backup copy of the data
+            copyFiles()
+            # get a list of images in current directory
+            images = getImageList()
+            # rename the images to make them easier to read
+            renameFiles(images)
+            # get new filenames
+            images = getImageList()
+            # make a master bias
+            master_bias = makeMasterBias(images)
+            # make a master flat
+            master_flat = makeMasterFlat(images, master_bias)
+            # correct the arcs
+            for filename in images.files_filtered(imagetyp=ARC_KEYWORD):
+                correctData(filename, master_bias, master_flat, 'arc')
+            # correct the science spectra
+            for filename in images.files_filtered(imagetyp=SCIENCE_KEYWORD):
+                correctData(filename, master_bias, master_flat, 'science')
+            cleanCalibs()
+            # extract wavelength calibrated and continuum normalised spectra
+            extractSpectra()
+            # round up the reduced spectra
+            roundUpSpectra()
+            # remove all the intermediate data products
+            eraseIntermediateProducts()
+        # log the spectra to the database
+        logSpectraToDb()
+    else:
+        print('The --ready flag is needed to show that all\njunk images have been removed')
