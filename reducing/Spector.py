@@ -71,6 +71,7 @@ OBSERVATORY = EarthLocation(lat=olat*u.deg, lon=olon*u.deg, height=elev*u.m)
 
 def argParse():
     parser = ap.ArgumentParser()
+    parser.add_argument('refarc', help='image_id of the long arc used for master solution')
     parser.add_argument('--ready',
                         help='set this to show all the junk is removed',
                         action='store_true')
@@ -344,12 +345,13 @@ def extractSpectra():
     iraf.apall.setParam('nsubaps', '1')
     iraf.apall.saveParList(filename="apall.pars")
 
-    # TODO
-    # Make a reference using a long exposure arc
-    # TODO
-
     # make reference arc for reidentify
-    refarc = None
+    if '.' in args.refarc:
+        args.refarc = args.refarc.split('.')[0]
+    refarc = "a_s_{}_t.fits".format(args.refarc)
+    refarc_out = "a_s_{}_t.ms.fits".format(args.refarc)
+
+    # loop over all the the spectra
     for i in range(0, len(templist)):
         hdulist = fits.open(templist[i])
         prihdr = hdulist[0].header
@@ -402,6 +404,16 @@ def extractSpectra():
         # get a list of the extracted arcs and objects
         spectrum_out = "i_s_r{0:d}_t.ms.fits".format(spectrum_id)
         if i == 0:
+            # extract the master reference arc
+            print("\nExtracting master arc {} under the same conditions...".format(refarc))
+            iraf.apall(input=refarc,
+                       reference=reffile,
+                       recente="no",
+                       trace="no",
+                       backgro="no",
+                       interac="no")
+            print("Reference arc {} extracted".format(refarc))
+            # identify the lines in it
             print("\nIdentify arc lines:")
             print("Enter the following in the splot window")
             print("\t:thres 500")
@@ -413,15 +425,11 @@ def extractSpectra():
             print("Press 'f' to fit the dispersion correction")
             print("Use 'd' to remove bad points, 'f' to refit")
             print("'q' from fit, then 'q' from identify to continue\n")
-            refarc = arclist[0]
-            iraf.identify(images=refarc, coordlist=lineList_location)
-            if len(arclist) > 1:
-                iraf.reidentify(reference=refarc, images=arclist[1])
-        if i > 0:
-            print("\nReidentifying arclines from {}".format(refarc))
-            iraf.reidentify(reference=refarc, images=arclist[0])
-            if len(arclist) > 1:
-                iraf.reidentify(reference=refarc, images=arclist[1])
+            iraf.identify(images=refarc_out, coordlist=lineList_location)
+        # use the refarc to ID all the subsequent arcs
+        for arc in arclist:
+            print("\nReidentifying arclines from {}".format(arc))
+            iraf.reidentify(reference=refarc_out, images=arc)
         # add the refspec keywords to the image header for dispcor
         # refspec_factor tells IRAF how to interpolate the arcs
         refspec_factor = round((1./len(arclist)), 1)
@@ -497,7 +505,7 @@ def logSpectraToDb():
         utmiddle = hdr['UT-MID']
         pa = hdr['ROTSKYPA']
         n_traces = d.shape[1]
-        qry = """INSERT INTO eblm_ids
+        qry = """INSERT INTO eblm_ids_final
                 (image_id,
                 object_name,
                 bjd_mid,
@@ -527,6 +535,9 @@ if __name__ == '__main__':
     print('---------------------------------------------------------\n')
     # get command line args
     args = argParse()
+    if not os.path.exists(args.refarc):
+        print('{} not found, quitting'.format(arg.refarc))
+        sys.exit(1)
     if args.ready:
         if not args.log_only:
             # make a local backup copy of the data

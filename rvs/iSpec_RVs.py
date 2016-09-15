@@ -5,6 +5,10 @@ velocity and telluric features before doing the
 cross correlation
 
 TODO:
+    USE THE RIGHT MASK FOR EACH OBJECT!!!!
+    READ THEM ALL THEN USE THE CLOSEST SPEC TYPE!!!!
+    FIX THIS ASAP!!!
+
     Save out plots of:
         1. CCF for each spectrum
         2. Spectrum (various steps of reduction)
