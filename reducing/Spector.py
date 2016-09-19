@@ -2,6 +2,8 @@
 Spector - A tool for extracting 1D spectra from INT/IDS
 
 TODO:
+    Implement a way to do partial reductions
+
 """
 import sys
 import os
@@ -77,6 +79,9 @@ def argParse():
                         action='store_true')
     parser.add_argument('--log_only',
                         help='use this to log spectra to db only',
+                        action='store_true')
+    parser.add_argument('--ds9',
+                        help='use this to display spectra in DS9',
                         action='store_true')
     return parser.parse_args()
 
@@ -330,6 +335,7 @@ def extractSpectra():
     iraf.apall.setParam('t_nsum', '10')
     iraf.apall.setParam('t_step', '10')
     iraf.apall.setParam('t_nlost', '3')
+    iraf.apall.setParam('t_niter', '7')
     iraf.apall.setParam('t_funct', 'spline3')
     iraf.apall.setParam('t_order', '3')
     iraf.apall.setParam('backgro', 'fit')
@@ -357,6 +363,8 @@ def extractSpectra():
         prihdr = hdulist[0].header
         target_id = prihdr['CAT-NAME']
         spectrum_id = int(templist[i].split('_')[2].split('r')[1])
+        if args.ds9:
+            os.system('xpaset fuckingds9 fits < {}'.format(templist[i]))
         # extract the object spectrum
         print("[{}/{}] Extracting spectrum of {} from image {}".format(i+1, len(templist), target_id, templist[i]))
         print("[{}/{}] Check aperture and background. Change if required".format(i+1, len(templist)))
@@ -417,7 +425,7 @@ def extractSpectra():
             print("\nIdentify arc lines:")
             print("Enter the following in the splot window")
             print("\t:thres 500")
-            print("\t:order 3")
+            print("\t:order 1, max = 3")
             print("\tfwidth 2")
             print("Select 3-5 arc lines from line atlas")
             print("Press 'm' to mark, then enter wavelength")
@@ -505,7 +513,7 @@ def logSpectraToDb():
         utmiddle = hdr['UT-MID']
         pa = hdr['ROTSKYPA']
         n_traces = d.shape[1]
-        qry = """INSERT INTO eblm_ids_final
+        qry = """REPLACE INTO eblm_ids_final
                 (image_id,
                 object_name,
                 bjd_mid,
@@ -536,10 +544,14 @@ if __name__ == '__main__':
     # get command line args
     args = argParse()
     if not os.path.exists(args.refarc):
-        print('{} not found, quitting'.format(arg.refarc))
+        print('{} not found, quitting'.format(args.refarc))
         sys.exit(1)
     if args.ready:
         if not args.log_only:
+            if args.ds9:
+                # pyds9 was being a shit in astroconda env
+                # beat it into submission with direct access via xpa
+                os.system('ds9 -title fuckingds9 &')
             # make a local backup copy of the data
             copyFiles()
             # get a list of images in current directory
