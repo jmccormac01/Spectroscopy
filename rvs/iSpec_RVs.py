@@ -9,6 +9,10 @@ TODO:
     READ THEM ALL THEN USE THE CLOSEST SPEC TYPE!!!!
     FIX THIS ASAP!!!
 
+    **^^^^^^^^^^^^^^ STARTED ^^^^^^^^^^^^^^^^^***
+    *** Check all objects have spectral types ***
+    ** ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^***
+
     Save out plots of:
         1. CCF for each spectrum
         2. Spectrum (various steps of reduction)
@@ -31,18 +35,14 @@ import ispec
 
 # set up the locations of the various lines and mask files
 strongLines = iSpec_location + '/input/regions/strong_lines/absorption_lines.txt'
-telluricLines = iSpec_location + "/input/linelists/CCF/Synth.Tellurics.500_1100nm/mask.lst"
-atomicMaskLines = iSpec_location + "/input/linelists/CCF/Narval.Sun.370_1048nm/mask.lst"
-# "/input/linelists/CCF/Atlas.Arcturus.372_926nm/mask.lst""
-# "/input/linelists/CCF/Atlas.Sun.372_926nm/mask.lst"
-# "/input/linelists/CCF/HARPS_SOPHIE.A0.350_1095nm/mask.lst"
-# "/input/linelists/CCF/HARPS_SOPHIE.F0.360_698nm/mask.lst"
-# "/input/linelists/CCF/HARPS_SOPHIE.G2.375_679nm/mask.lst"
-# "/input/linelists/CCF/HARPS_SOPHIE.K0.378_679nm/mask.lst"
-# "/input/linelists/CCF/HARPS_SOPHIE.K5.378_680nm/mask.lst"
-# "/input/linelists/CCF/HARPS_SOPHIE.M5.400_687nm/mask.lst"
-# "/input/linelists/CCF/Synthetic.Sun.350_1100nm/mask.lst"
-# "/input/linelists/CCF/VALD.Sun.300_1100nm/mask.lst"
+line_lists_parent = iSpec_location + '/input/linelists/CCF/'
+telluricLines = line_lists_parent + "Synth.Tellurics.500_1100nm/mask.lst"
+atomicMasLines {'A0': line_lists_parent + 'HARPS_SOPHIE.A0.350_1095nm/mask.lst',
+                'F0': line_lists_parent + 'HARPS_SOPHIE.F0.360_698nm/mask.lst',
+                'G2': line_lists_parent + 'HARPS_SOPHIE.G2.375_679nm/mask.lst',
+                'K0': line_lists_parent + 'HARPS_SOPHIE.K0.378_679nm/mask.lst',
+                'K5': line_lists_parent + 'HARPS_SOPHIE.K5.378_680nm/mask.lst',
+                'M5': line_lists_parent + 'HARPS_SOPHIE.M5.400_687nm/mask.lst'}
 
 # set up observatory
 olat = 28.+(45./60.)-(37./3600.)
@@ -151,6 +151,14 @@ def getRaDec(spec):
     dec_s = round(c.dec.dms.s, 2)
     return c, (ra_h, ra_m, ra_s, dec_d, dec_m, dec_s)
 
+def getCcfMaskType():
+    """
+    Find the closest spectral type to use for the RVs
+    """
+    print('getCcfMaskType() says:')
+    print('Add this function before continuing')
+    sys.exit(1)
+
 def normaliseContinuum(spec):
     """
     Based on example.py
@@ -231,13 +239,13 @@ def cleanTelluricRegions(spec):
     clean_spec = spec[~tfilter]
     return bv, bv_err, clean_spec
 
-def measureRadialVelocityWithMask(spec):
+def measureRadialVelocityWithMask(spec, mask_type):
     """
     Radial velocity measurement using atomic line list
 
     Based on example.py determine_radial_velocity_with_mask() function
     """
-    ccf_mask = ispec.read_linelist_mask(atomicMaskLines)
+    ccf_mask = ispec.read_linelist_mask(atomicMaskLines[mask_type])
     models, ccf = ispec.cross_correlate_with_mask(spec, \
                                                   ccf_mask, \
                                                   lower_velocity_limit=-200, \
@@ -376,6 +384,7 @@ if __name__ == '__main__':
             print('Grabbing times from database for {}'.format(spectrum))
             # get the mid time in iSpec format
             utmid, dateobs, n_traces = getDateObs(spectrum)
+            mask_type = getCcfMaskType(swasp_id)
             if n_traces > 1:
                 print('BLEND, SKIPPING...')
                 continue
@@ -416,7 +425,7 @@ if __name__ == '__main__':
             if args.plot:
                 ax[0].plot(spec['waveobs'], spec['flux'], 'b-')
             # measure the radial velocity using an atomic line list
-            atomic_rv, atomic_rv_err, components, models, ccf = measureRadialVelocityWithMask(spec)
+            atomic_rv, atomic_rv_err, components, models, ccf = measureRadialVelocityWithMask(spec, mask_type)
             ccf_height = min(ccf['y'])
             ccf_heights.append(ccf_height)
             ccf_fwhm = models[0].sig()
