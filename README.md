@@ -44,12 +44,20 @@ Gathering Spectra for Analysis with iSpec
 -----------------------------------------
 
 After reduction and extraction with Spector the files should be combined
-into one location for RV analysis using:
+into one location for RV analysis. The files from multiple nights are
+linked by their ```SWASP\_ID```. First populate the database column with
+each spectrum's ```SWASP\_ID``` using:
+
+```python setSwaspIds.py```
+
+Manually add any missing entries to the database and/or resolve naming
+or typos at the telescope. Once all the ```SWASP_ID``` keywords have been
+populated, gather all the spectra into per-object folders for analysis using:
 
 ```python gatherSpectraFor_iSpec.py```
 
-This gets the unique list of targets from the database and puts all the spectra
-together in one folder per object for analysis with iSpec.
+This gets the unique list of targets from the database and puts all the 
+spectra together in one folder per object ready for analysis with iSpec.
 
 Measuring RVs with iSpec
 ------------------------

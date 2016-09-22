@@ -492,6 +492,18 @@ def eraseIntermediateProducts():
     for i in g.glob('a*.fits'):
         os.system('rm {}'.format(i))
 
+def utmiddleToNight(utmid):
+    """
+    Function to calculate night using the utmiddle
+    """
+    utmid = datetime.strptime(utmid, '%Y-%m-%dT%H:%M:%S.%f')
+    if utmid.hour < 12:
+        td = 1
+    else:
+        td = 0
+    night = (utmid-timedelta(days=td)).strftime('%Y%m%d')
+    return night
+
 def logSpectraToDb():
     """
     Merged from LogSpectraToDB.py
@@ -513,6 +525,7 @@ def logSpectraToDb():
         utmiddle = hdr['UT-MID']
         pa = hdr['ROTSKYPA']
         n_traces = d.shape[1]
+        night = utmiddleToNight(utmiddle)
         qry = """REPLACE INTO eblm_ids_final
                 (image_id,
                 object_name,
@@ -521,9 +534,10 @@ def logSpectraToDb():
                 jd_mid,
                 utmiddle,
                 n_traces,
-                sky_pa)
+                sky_pa,
+                night)
                 VALUES
-                ('{}', '{}', {}, {}, {}, '{}', {}, {})
+                ('{}', '{}', {}, {}, {}, '{}', {}, {}, '{}')
                 """.format(image_id,
                            object_name,
                            bjd_mid,
@@ -531,11 +545,25 @@ def logSpectraToDb():
                            jd_mid,
                            utmiddle.replace("T", " "),
                            n_traces,
-                           pa)
+                           pa,
+                           night)
         print(qry)
         with db.cursor() as cur:
             cur.execute(qry)
             db.commit()
+
+def checkForDs9():
+    """
+    Find fuckingds9
+    """
+    processes = os.popen('ps aux | grep fuckingds9').readlines()
+    for process in processes:
+        if "ds9 -title fuckingds9" in process:
+            print('Hurray!')
+            return True
+    else:
+        print('Boo!')
+        return False
 
 if __name__ == '__main__':
     print('\n\n---------------------------------------------------------')
@@ -551,7 +579,10 @@ if __name__ == '__main__':
             if args.ds9:
                 # pyds9 was being a shit in astroconda env
                 # beat it into submission with direct access via xpa
-                os.system('ds9 -title fuckingds9 &')
+                # check for window
+                already_ds9 = checkForDs9()
+                if not already_ds9:
+                    os.system('ds9 -title fuckingds9 &')
             # make a local backup copy of the data
             copyFiles()
             # get a list of images in current directory

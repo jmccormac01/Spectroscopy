@@ -3,13 +3,6 @@ Here were check the database for all spectra for
 each object and check they are all in one place 
 for analysis. If they are do nothing, if they are not
 then copy them to the iSpec folder. 
-
-Then with iSpec_RVs we can cycle through all the objects 
-that need analysing. The results should all go in a new 
-database tables also. 
-
-Then point the angular interface at this table instead of
-the current eblm_ids_new table
 """
 
 import os
@@ -21,7 +14,9 @@ top_dir = '/Users/James/Dropbox/data/int/ids/eblm'
 iSpec_dir = '{}/all_spectra'.format(top_dir)
 
 # connect to the database
-db = pymysql.connect(host='localhost', db='eblm')
+db = pymysql.connect(host='localhost',
+                     db='eblm',
+                     password='mysqlpassword')
 
 def argParse():
     """
@@ -34,38 +29,21 @@ def argParse():
                         action='store_true')
     return parser.parse_args()
 
-def utmiddleToNight():
+def getUniqueTargetList():
     """
-    Function to update night column using the utmiddle column
+    Gather up a list of unique eblm targets in database
     """
-    qry = """SELECT
-           image_id,
-           utmiddle
-           FROM
-           eblm_ids
-           """
+    qry = """
+        SELECT distinct(swasp_id)
+        FROM eblm_ids_final
+        WHERE swasp_id IS NOT NULL
+        """
+    swasp_ids = []
     with db.cursor() as cur:
         cur.execute(qry)
         for row in cur:
-            image_id = row[0]
-            utmid = row[1]
-            if utmid.hour < 12:
-                td = 1
-            else:
-                td = 0
-            night = (utmid-timedelta(days=td)).strftime('%Y%m%d')
-            print(image_id, utmid, night)
-            qry2 = """UPDATE
-                    eblm_ids
-                    SET
-                    night = '{}'
-                    WHERE
-                    image_id = '{}'
-                    """.format(night, image_id)
-            print(qry2)
-            with db.cursor() as cur2:
-                cur2.execute(qry2)
-                db.commit()
+            swasp_ids.append(row[0])
+    return swasp_ids
 
 def gatherAllTargetSpectra(swasp_id):
     """
@@ -81,9 +59,8 @@ def gatherAllTargetSpectra(swasp_id):
         os.mkdir(target_dir)
     # qry all the spectra in the database for this object
     qry = """
-        SELECT
-        image_id,night
-        FROM eblm_ids
+        SELECT image_id,night
+        FROM eblm_ids_final
         WHERE swasp_id = '{}'
         """.format(swasp_id)
     with db.cursor() as cur:
@@ -105,22 +82,6 @@ def gatherAllTargetSpectra(swasp_id):
             else:
                 print('{} EXISTS IN COMBINED FOLDER'.format(spectrum_dest))
     print('\n\n')
-
-def getUniqueTargetList():
-    """
-    Gather up a list of unique eblm targets in database
-    """
-    qry = """
-        SELECT distinct(swasp_id)
-        FROM eblm_ids
-        WHERE swasp_id is not null
-        """
-    swasp_ids = []
-    with db.cursor() as cur:
-        cur.execute(qry)
-        for row in cur:
-            swasp_ids.append(row[0])
-    return swasp_ids
 
 if __name__ == '__main__':
     args = argParse()
