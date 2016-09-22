@@ -10,8 +10,11 @@ import argparse as ap
 from datetime import timedelta
 import pymysql
 
+# set up the per object master directory
 top_dir = '/Users/James/Dropbox/data/int/ids/eblm'
 iSpec_dir = '{}/all_spectra'.format(top_dir)
+if not os.path.exists(iSpec_dir):
+    os.mkdir(iSpec_dir)
 
 # connect to the database
 db = pymysql.connect(host='localhost',
@@ -42,7 +45,8 @@ def getUniqueTargetList():
     with db.cursor() as cur:
         cur.execute(qry)
         for row in cur:
-            swasp_ids.append(row[0])
+            if row[0] != 'None':
+                swasp_ids.append(row[0])
     return swasp_ids
 
 def gatherAllTargetSpectra(swasp_id):
@@ -53,6 +57,8 @@ def gatherAllTargetSpectra(swasp_id):
     If the spectrum exists in the target location
     do not copy it again
     """
+    # keep a count of the number of spectra to copy
+    total = 0
     # check for the directory that is to contain the spectra
     target_dir = '{}/{}'.format(iSpec_dir, swasp_id)
     if not os.path.exists(target_dir) and args.copy:
@@ -77,15 +83,19 @@ def gatherAllTargetSpectra(swasp_id):
                     print('Copying {} to {}'.format(spectrum_source, spectrum_dest))
                     if args.copy:
                         os.system('cp {} {}/{}/'.format(spectrum_source, iSpec_dir, swasp_id))
+                    total += 1
                 else:
                     print('{} DOES NOT EXIST!'.format(spectrum_source))
             else:
                 print('{} EXISTS IN COMBINED FOLDER'.format(spectrum_dest))
     print('\n\n')
+    return total
 
 if __name__ == '__main__':
     args = argParse()
     swasp_ids = getUniqueTargetList()
-    for swasp_id in swasp_ids:
-        gatherAllTargetSpectra(swasp_id)
-
+    total = 0
+    for swasp_id in sorted(swasp_ids):
+        subtotal = gatherAllTargetSpectra(swasp_id)
+        total += subtotal
+    print('{} spectra to be copied'.format(total))
