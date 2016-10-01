@@ -59,6 +59,16 @@ populated, gather all the spectra into per-object folders for analysis using:
 This gets the unique list of targets from the database and puts all the 
 spectra together in one folder per object ready for analysis with iSpec.
 
+Estimating Spectral Type
+------------------------
+
+To use the right CCF mask with iSpec we need to estimate the spectral type
+of the target. This can be done by getting the Teff_jh and Teff_vk from Hunter
+and then using the Teff-to-Spectral_Type translation to estimate the type
+based on the average of the two temperatures. This is not super accurate but
+should be enough to distinguish F from K or M stars. **Double check the star's
+spectral types individually before getting excited**
+
 Measuring RVs with iSpec
 ------------------------
 
