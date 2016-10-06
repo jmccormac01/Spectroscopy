@@ -4,19 +4,22 @@ and atomic line lists. Corrects for barycentric
 velocity and telluric features before doing the
 cross correlation
 
+I had a hard time getting the absolute RVs to agree
+with the numbers coming from CERES/CAFE. I assumed they
+were right and then found the following way to get the
+RVS to agree (mostly). The relative offsets (which are
+the most important) were fine from the old method, this 
+is to get the absolute RVs to agree.
+
+    1. Measure velocity wrt Tellurics
+    1. Correct this velocity
+    1. Measure barycentric velocity
+    1. Apply -BCV to Telluric corrected spectrum
+    1. Measure RVs with atomic line mask
+
 TODO:
-    Read in only the right fits extension. iSpec
-    will concatenate them all even though (for IDS)
-    the extra extenions are not real spectra (bkg etc)
+    Finalise the system for analysing the blends
 
-    Measure RV wrt:
-        1. First spectrum
-        2. Mask - DONE
-
-    Save out plots of:
-        1. One plot, spectrum along the top
-           with 2x2 grid below of RV and CCF
-           for mask and template
 """
 import os
 import sys
@@ -71,7 +74,13 @@ INSTRUMENT = {'FIES': {'RA': 'OBJRA', \
              }
 
 # acceptable comments for the CCF
-valid_comments = ['sp', 'dp', 'np', 'mp', 'bp']
+# sp = single peaked
+# dp = double peaked
+# np = no peak
+# mp = multiple peaked
+# bp = broad peaked
+# ap = asymetrical peaked
+valid_comments = ['sp', 'dp', 'np', 'mp', 'bp', 'ap']
 
 def argParse():
     """
@@ -92,6 +101,10 @@ def argParse():
                         default='425.0,700.0')
     parser.add_argument('--swasp_id',
                         help='swasp_id of single object to measure')
+    parser.add_argument('--no_comment',
+                        help=('skip adding comments to individual spectra, '
+                              'only to be used for debugging'),
+                        action='store_true')
     return parser.parse_args()
 
 def getHostIP():
@@ -111,13 +124,43 @@ def getSwaspIds():
         FROM eblm_ids_final
         WHERE barycentric_velocity_iSpec IS NULL
         AND swasp_id IS NOT NULL
-        AND n_traces = 1
+        ORDER BY swasp_id
         """
     with db.cursor() as cur:
         cur.execute(qry)
         for row in cur:
             swasp_ids.append(row[0])
     return swasp_ids
+
+def isThisABlend(swasp_id, epoch, period):
+    """
+    Check to see if an object has multiple
+    spectra, they need done separately
+
+    Give a summary of the blends so we know to
+    continue observing or not
+    """
+    n_traces, phase, image_ids, utmiddle = [], [], [], []
+    qry = """
+        SELECT n_traces, bjd_mid, image_id, utmiddle
+        FROM eblm_ids_final
+        WHERE swasp_id ='{}'
+        """.format(swasp_id)
+    with db.cursor() as cur:
+        qry_len = cur.execute(qry)
+        for row in cur:
+            n_traces.append(int(row[0]))
+            phase.append(((float(row[1])-epoch)/period)%1)
+            image_ids.append(row[2])
+            utmiddle.append(row[3])
+    if n_traces.count(1) != qry_len:
+        print('\n{} has multiple spectra, skipping...\n'.format(swasp_id))
+        for i, j, k, l in zip(image_ids, utmiddle, phase, n_traces):
+            print(i, j, k, l)
+        return True
+    else:
+        print('\n{} has single spectra, analysing...'.format(swasp_id))
+        return False
 
 def getDateObs(spec):
     """
@@ -197,11 +240,18 @@ def getCcfMaskType(swasp_id, spec_types, maskIndexes):
     """
     Find the closest spectral type to use for the RVs
     """
-    qry = """
-        SELECT paramfit_spec_type
-        FROM eblm_parameters
-        WHERE swasp_id = '{}'
-        """.format(swasp_id)
+    if swasp_id.startswith('HD'):
+        qry = """
+            SELECT spec_type
+            FROM rv_standards
+            WHERE object_id = '{}'
+            """.format(swasp_id)
+    else:
+        qry = """
+            SELECT paramfit_spec_type
+            FROM eblm_parameters
+            WHERE swasp_id = '{}'
+            """.format(swasp_id)
     with db.cursor() as cur:
         cur.execute(qry)
         for row in cur:
@@ -213,7 +263,7 @@ def getCcfMaskType(swasp_id, spec_types, maskIndexes):
             diff = abs(maskIndexes[mask]-index)
             match = mask
     print ('Spectral Type: {} - Mask Match: {}'.format(spec_type, match))
-    return match
+    return spec_type, match
 
 def normaliseContinuum(spec):
     """
@@ -279,10 +329,12 @@ def cleanTelluricRegions(spec):
                                                   mask_depth=0.01, \
                                                   fourier=False, \
                                                   only_one_peak=True)
-
-    bv = np.round(models[0].mu(), 2) # km/s
-    bv_err = np.round(models[0].emu(), 2) # km/s
-
+    try:
+        bv = np.round(models[0].mu(), 2) # km/s
+        bv_err = np.round(models[0].emu(), 2) # km/s
+    except IndexError:
+        print '\n\n\nPROBLEM MEASURING TELLURICS, SKIPPING...\n\n\n'
+        return 0.0, 0.0, spec
     # not sure why we load this again, but iSpec example does, so...
     linelist_telluric = ispec.read_telluric_linelist(telluricLines, minimum_depth=0.0)
     # clean regions that may be affected by tellurics
@@ -304,19 +356,22 @@ def measureRadialVelocityWithTemplate(spec, ref_spec):
 
     Based on example.py determine_radial_velocity_with_template() function
     """
-    models, ccf = ispec.cross_correlate_with_mask(spec, \
-                                                  ref_spec, \
-                                                  lower_velocity_limit=-200, \
-                                                  upper_velocity_limit=200, \
-                                                  velocity_step=0.25, \
-                                                  mask_depth=0.01, \
-                                                  fourier=False)
+    models, ccf = ispec.cross_correlate_with_template(spec, \
+                                                      ref_spec, \
+                                                      lower_velocity_limit=-200, \
+                                                      upper_velocity_limit=200, \
+                                                      velocity_step=0.25, \
+                                                      fourier=False)
 
     # Number of models represent the number of components
     components = len(models)
     # First component:
-    rv = np.round(models[0].mu(), 2) # km/s
-    rv_err = np.round(models[0].emu(), 2) # km/s
+    try:
+        rv = np.round(models[0].mu(), 2) # km/s
+        rv_err = np.round(models[0].emu(), 2) # km/s
+    except IndexError:
+        print '\n\n\nPROBLEM RV WITH TEMPLATE, SKIPPING...\n\n\n'
+        return 0.0, 0.0, 0, None, None
     return rv, rv_err, components, models, ccf
 
 def measureRadialVelocityWithMask(spec, mask_type):
@@ -337,8 +392,12 @@ def measureRadialVelocityWithMask(spec, mask_type):
     # Number of models represent the number of components
     components = len(models)
     # First component:
-    rv = np.round(models[0].mu(), 2) # km/s
-    rv_err = np.round(models[0].emu(), 2) # km/s
+    try:
+        rv = np.round(models[0].mu(), 2) # km/s
+        rv_err = np.round(models[0].emu(), 2) # km/s
+    except IndexError:
+        print '\n\n\nPROBLEM RV WITH MASK, SKIPPING...\n\n\n'
+        return 0.0, 0.0, 0, None, None
     return rv, rv_err, components, models, ccf
 
 def getLightTravelTimes(target, time2corr):
@@ -370,12 +429,17 @@ def getTargetParams(swasp_id):
             spectral_type = row[2]
     return epoch, period, spectral_type
 
-
-def logRVsToDb(image_id,
-               ccf_height,
-               ccf_fwhm,
-               atomic_rv,
-               atomic_rv_err,
+def logRVsToDb(spectrum,
+               mask,
+               mask_ccf_height,
+               mask_ccf_fwhm,
+               mask_rv,
+               mask_rv_err,
+               template,
+               template_ccf_height,
+               template_ccf_fwhm,
+               template_rv,
+               template_rv_err,
                v_tell,
                v_tell_err,
                barycentric_velocity,
@@ -385,25 +449,38 @@ def logRVsToDb(image_id,
     """
     qry = """
         UPDATE eblm_ids_final SET
-        ccf_height = {},
-        ccf_fwhm = {},
-        atomic_velocity = {},
-        atomic_velocity_err = {},
+        mask = '{}',
+        mask_ccf_height = {},
+        mask_ccf_fwhm = {},
+        mask_velocity = {},
+        mask_velocity_err = {},
+        template = '{}',
+        template_ccf_height = {},
+        template_ccf_fwhm = {},
+        template_velocity = {},
+        template_velocity_err = {},
         telluric_velocity = {},
         telluric_velocity_err = {},
         barycentric_velocity_iSpec = {},
         comment = '{}'
         WHERE
         image_id = '{}'
-        """.format(ccf_height,
-                   ccf_fwhm,
-                   atomic_rv,
-                   atomic_rv_err,
+        """.format(mask,
+                   mask_ccf_height,
+                   mask_ccf_fwhm,
+                   mask_rv,
+                   mask_rv_err,
+                   template,
+                   template_ccf_height,
+                   template_ccf_fwhm,
+                   template_rv,
+                   template_rv_err,
                    v_tell,
                    v_tell_err,
                    barycentric_velocity,
                    comment,
-                   image_id)
+                   spectrum)
+    print(qry)
     with db.cursor() as cur:
         cur.execute(qry)
         db.commit()
@@ -458,14 +535,30 @@ if __name__ == '__main__':
         swasp_ids = [args.swasp_id]
 
     for swasp_id in swasp_ids:
+        # get the epoch and period from db
+        if not swasp_id.startswith('HD'):
+            epoch, period, spectral_type = getTargetParams(swasp_id)
+            print('{} E={} P={} ST={}'.format(swasp_id, epoch, period, spectral_type))
+        # treat blends properly later!
+        blend = isThisABlend(swasp_id, epoch, period)
+        if blend:
+            # update the status?
+            current_status = getCurrentStatus(swasp_id)
+            print('Current status: {}'.format(current_status))
+            if not args.no_comment:
+                update_status = raw_input('Update Status? (y/n): ')
+                if update_status == 'y':
+                    new_status = raw_input('New Status: ')
+                    updateTargetStatus(swasp_id, new_status)
+            continue
+
         target_dir = '{}/{}'.format(iSpec_dir, swasp_id)
         os.chdir(target_dir)
-        # get the epoch and period from db
-        epoch, period, spectral_type = getTargetParams(swasp_id)
-        print('{} E={} P={} ST={}'.format(swasp_id, epoch, period, spectral_type))
         # get list of spectra
         spectra = g.glob('*.fits')
         print('Found {} spectra for {}'.format(len(spectra), swasp_id))
+        # get the mask type for this object
+        spec_type, mask_type = getCcfMaskType(swasp_id, spec_types_list, atomicMaskLinesIndexes)
 
         # arrays/dicts to hold the results
         results = {}
@@ -474,27 +567,28 @@ if __name__ == '__main__':
         template_rvs, template_rvs_errs = [], []
         mask_ccf_heights, mask_ccf_fwhms = [], []
         template_ccf_heights, template_ccf_fwhms = [], []
+        v_tells, v_tell_errs = [], []
+        barycentric_velocities = []
+        abs_rvs = []
 
         # loop over the spectra
         for spec_id, spectrum in enumerate(spectra):
             # get the mid time in iSpec format
             utmid, dateobs, n_traces = getDateObs(spectrum)
             print('{} Queried times from database...'.format(spectrum))
-            mask_type = getCcfMaskType(swasp_id, spec_types_list, atomicMaskLinesIndexes)
-            if n_traces > 1:
-                print('\n{} {} BLEND, SKIPPING...'.format(swasp_id, spectrum))
-                print('ADD A FLAG TO DATABASE FOR THSE OBJECTS!!\n')
-                continue
             # get the target coords in iSpec format
             c, coords = getRaDec(spectrum)
+            print('{} Gathered target coordinates...'.format(spectrum))
             # get the barycentric velocity
             barycentric_velocity = getBarycentricVelocity(dateobs, coords)
+            barycentric_velocities.append(barycentric_velocity)
             print('{} Barycentric velocity {} km/s...'.format(spectrum, barycentric_velocity))
             # bjd and hjd corrections
             ltt_bary, ltt_helio = getLightTravelTimes(c, utmid)
             bjd = utmid.tdb + ltt_bary
             hjd = utmid.utc + ltt_helio
             print('{} Light travel times calculated...'.format(spectrum))
+
             # set up the plots
             if args.plot:
                 #fig, ax = plt.subplots(3, 1, figsize=(10, 10))
@@ -507,9 +601,12 @@ if __name__ == '__main__':
                 ax_mask_ccf = plt.subplot2grid((6, 4), (4, 0), colspan=2, rowspan=2)
                 ax_mask_ccf.set_title('CCF wrt {}'.format(mask_type))
                 plt.subplots_adjust(hspace=1.0)
+                plt.show()
+
             # read in the spectrum
             spec = ispec.read_spectrum(spectrum)
             print('{} Loaded...'.format(spectrum))
+
             # chop out the wavelength range we want to work on
             # accesss the data using column names
             # e.g. s['waveobs' | 'flux' | 'err']
@@ -522,51 +619,86 @@ if __name__ == '__main__':
                                             INSTRUMENT[args.instrument]['WV_ULIM']))
             if args.plot:
                 ax_spec.plot(spec['waveobs'], spec['flux'], 'r-')
-                ax_spec.set_xlabel('Wavelength (nm)')
-            # correct the spectrum to the barycentre
-            spec = correctBarycentricVelocity(spec, barycentric_velocity)
-            print('{} Barycentric velocity correction applied...'.format(spectrum))
-            if args.plot:
-                ax_spec.plot(spec['waveobs'], spec['flux'], 'b-')
-            # take the first spectrum as the reference for
-            # template cross correlations
-            if spec_id == 0:
-                reference_spectrum = spec
-                print('{} is the template spectrum for this object'.format(spectrum))
+
             # normalise the continuum
             if args.norm:
                 spec = normaliseContinuum(spec)
                 print('{} Continuum normalised...'.format(spectrum))
                 if args.plot:
-                    ax_spec.plot(spec['waveobs'], spec['flux'], 'k-')
+                    ax_spec.plot(spec['waveobs'], spec['flux'], 'r-')
+
             # clean tellurics from the normalised spectrum
             v_tell, v_tell_err, spec = cleanTelluricRegions(spec)
+            v_tells.append(v_tell)
+            v_tell_errs.append(v_tell_err)
+            # correct the velocity relative to the tellurics
+            spec = correctBarycentricVelocity(spec, v_tell)
+            print('{} Telluric velocity correction applied...'.format(spectrum))
             print('{} Tellurics regions cleaned...'.format(spectrum))
             print('v_Tell = {} v_Tell_err = {}'.format(v_tell, v_tell_err))
+            if args.plot:
+                ax_spec.plot(spec['waveobs'], spec['flux'], 'b-')
+                ax_spec.set_xlabel('Wavelength (nm)')
+
+            # correct the spectrum to the barycentre
+            spec = correctBarycentricVelocity(spec, -barycentric_velocity)
+            print('{} Barycentric velocity correction applied...'.format(spectrum))
+            if args.plot:
+                ax_spec.plot(spec['waveobs'], spec['flux'], 'g-')
+                ax_spec.set_xlabel('Wavelength (nm)')
+
+            # now all the steps have been done
+            # take the first spectrum as the reference for
+            # template cross correlations
+            if spec_id == 0:
+                reference_spectrum = spec
+                reference_spectrum_id = spectrum
+                print('{} is the template spectrum for this object'.format(spectrum))
+                ax_template_rv = plt.subplot2grid((6, 4), (2, 2), colspan=2, rowspan=2)
+                ax_template_rv.set_title('RV wrt {}'.format(reference_spectrum_id))
+                ax_template_ccf = plt.subplot2grid((6, 4), (4, 2), colspan=2, rowspan=2)
+                ax_template_ccf.set_title('CCF wrt {}'.format(reference_spectrum_id))
             if args.plot:
                 ax_spec.plot(spec['waveobs'], spec['flux'], 'k-')
 
             # measure the radial velocity using a atomic mask line list
             mask_rv, mask_rv_err, mask_components, mask_models, mask_ccf = measureRadialVelocityWithMask(spec, mask_type)
             print('{} Cross correlated with {} mask...'.format(spectrum, mask_type))
-            mask_ccf_height = min(mask_ccf['y'])
-            mask_ccf_heights.append(mask_ccf_height)
-            mask_ccf_fwhm = mask_models[0].sig()
-            mask_ccf_fwhms.append(mask_ccf_fwhm)
-            if args.plot:
-                ax_mask_ccf.plot(mask_ccf['x'], mask_ccf['y'], 'r-')
-                ax_mask_ccf.set_xlabel('Velocity (km/s)')
+            if mask_components < 1:
+                mask_ccf_height = 1.0
+                mask_ccf_heights.append(mask_ccf_height)
+                mask_ccf_fwhm = 50.0
+                mask_ccf_fwhms.append(mask_ccf_fwhm)
+            else:
+                mask_ccf_height = min(mask_ccf['y'])
+                mask_ccf_heights.append(mask_ccf_height)
+                mask_ccf_fwhm = mask_models[0].sig()
+                mask_ccf_fwhms.append(mask_ccf_fwhm)
+                if args.plot:
+                    ax_mask_ccf.plot(mask_ccf['x'], mask_ccf['y'], 'r-')
+                    ax_mask_ccf.set_xlabel('Velocity (km/s)')
             mask_rvs.append(mask_rv)
             mask_rvs_errs.append(mask_rv_err)
 
             # measure the radial velocity using a the first spectrum
             # as a reference spectrum
             template_rv, template_rv_err, template_components, template_models, template_ccf = measureRadialVelocityWithTemplate(spec, reference_spectrum)
-            print('{} Cross correlated with {}...'.format(spectrum, reference_spectrum))
-            template_ccf_height = min(template_ccf['y'])
-            template_ccf_heights.append(template_ccf_height)
-            template_ccf_fwhm = template_models[0].sig()
-            template_ccf_fwhms.append(template_ccf_fwhm)
+            print('{} Cross correlated with {}...'.format(spectrum, reference_spectrum_id))
+            if template_components < 1:
+                template_ccf_height = 1.0
+                template_ccf_heights.append(template_ccf_height)
+                template_ccf_fwhm = 50.0
+                template_ccf_fwhms.append(template_ccf_fwhm)
+            else:
+                template_ccf_height = min(template_ccf['y'])
+                template_ccf_heights.append(template_ccf_height)
+                template_ccf_fwhm = template_models[0].sig()
+                template_ccf_fwhms.append(template_ccf_fwhm)
+                if args.plot:
+                    ax_template_ccf.plot(template_ccf['x'], template_ccf['y'], 'r-')
+                    ax_template_ccf.set_xlabel('Velocity (km/s)')
+            template_rvs.append(template_rv)
+            template_rvs_errs.append(template_rv_err)
 
             # make a dictionary of the results
             results[bjd.jd] = (dateobs, \
@@ -579,53 +711,128 @@ if __name__ == '__main__':
                                template_rv_err)
             bjds.append(bjd.jd)
 
-            # python does the -ve wrap around check so no need to
-            # do it manually like in javascript
-            phase.append(((bjd.jd-epoch)/period)%1)
-            if args.plot:
-                # make some plots of the steps
-                ax_mask_rv.set_xlim(0, 1)
-                ax_mask_rv.errorbar(phase, mask_rvs, yerr=mask_rvs_errs, fmt='r.')
-                ax_mask_rv.set_xlabel('Orbital Phase')
-                plt.show()
-            # print per-spectrum summary
-            print(swasp_id,
+            if not swasp_id.startswith('HD'):
+                # python does the -ve wrap around check so no need to
+                # do it manually like in javascript
+                phase.append(((bjd.jd-epoch)/period)%1)
+                if args.plot:
+                    # make some plots of the steps
+                    ax_mask_rv.set_xlim(0, 1)
+                    ax_mask_rv.errorbar(phase, mask_rvs, yerr=mask_rvs_errs, fmt='r.')
+                    ax_mask_rv.set_xlabel('Orbital Phase')
+                    ax_template_rv.set_xlim(0, 1)
+                    ax_template_rv.errorbar(phase, template_rvs, yerr=template_rvs_errs, fmt='r.')
+                    ax_template_rv.set_xlabel('Orbital Phase')
+                    plt.show()
+
+            # print per-spectrum mask summary
+            print('Mask: {}'.format(mask_type),
+                  swasp_id,
                   spectrum,
                   round(mask_rv, 4),
                   round(mask_rv_err, 4),
                   round(mask_ccf_height, 4),
                   round(mask_ccf_fwhm, 4))
-            # get a comment about the spectrum
-            comment_valid = False
-            while not comment_valid:
-                comment = raw_input('Enter comment on spectrum: ')
-                if comment.lower() in valid_comments:
-                    comment_valid = True
-                    comments.append(comment.lower())
+            # print per-spectrum template summary
+            print('Refspec: {}'.format(reference_spectrum_id),
+                  swasp_id,
+                  spectrum,
+                  round(template_rv, 4),
+                  round(template_rv_err, 4),
+                  round(template_ccf_height, 4),
+                  round(template_ccf_fwhm, 4))
+
+            if not args.no_comment:
+                # get a comment about the spectrum
+                comment_valid = False
+                while not comment_valid:
+                    comment = raw_input('Enter comment on spectrum: ')
+                    if comment.lower() in valid_comments:
+                        comment_valid = True
+                        comments.append(comment.lower())
+            else:
+                comments.append('nc')
+
+            # DO NOT TURN THIS BACK ON UNITL:
+            #       PYLINT - FINAL
+            #       PROPER CHECK OF ALL CODE
+            #       FINAL CONFIRMATION WITH KNOWN RV OBJECTS
             # log all the info plus comment to the database
-            #logRVsToDb(spectrum,
-            #           mask_ccf_height,
-            #           mask_ccf_fwhm,
-            #           mask_rv,
-            #           mask_rv_err,
-            #           v_tell,
-            #           v_tell_err,
-            #           barycentric_velocity,
-            #           comment)
-        # print results and update the target in the database
-        current_status = getCurrentStatus(swasp_id)
-        print("\nSWASP_ID: {}".format(swasp_id))
-        print("Epoch: {} Period: {}".format(round(epoch, 6), round(period, 6)))
-        print("Current Status: {}".format(current_status))
-        print("BJD  PHASE  RV  CCF_HEIGHT  CCF_FWHM  COMMENTS")
-        for i, j, k, l, m, n in zip(bjds,
-                                    phase,
-                                    mask_rvs,
-                                    mask_ccf_heights,
-                                    mask_ccf_fwhms,
-                                    comments):
-            print(i, round(j, 4), round(k, 4), round(l, 4), round(m, 4), n)
-        update_status = raw_input('Update Status? (y/n): ')
-        if update_status == 'y':
-            new_status = raw_input('New Status: ')
-            updateTargetStatus(swasp_id, new_status)
+            logRVsToDb(spectrum,
+                       mask_type,
+                       mask_ccf_height,
+                       mask_ccf_fwhm,
+                       mask_rv,
+                       mask_rv_err,
+                       reference_spectrum_id,
+                       template_ccf_height,
+                       template_ccf_fwhm,
+                       template_rv,
+                       template_rv_err,
+                       v_tell,
+                       v_tell_err,
+                       barycentric_velocity,
+                       comment)
+
+        # don't do this for standard stars
+        if not swasp_id.startswith('HD'):
+            # print results and update the target in the database
+            current_status = getCurrentStatus(swasp_id)
+            print("\nSWASP_ID: {} SpecType: {}  Mask: {}".format(swasp_id,
+                                                                 spec_type,
+                                                                 mask_type))
+            print("Epoch: {} Period: {}".format(round(epoch, 6), round(period, 6)))
+            print("Current Status: {}".format(current_status))
+            print("BJD             PHASE   BCV    V_TELL   MRV  M_HEIGHT  M_FWHM   TRV  T_HEIGHT  T_FWHM  COMMENTS")
+            for i, j, k, l, m, n, o, p, q, r, s in zip(bjds,
+                                                       phase,
+                                                       barycentric_velocities,
+                                                       v_tells,
+                                                       mask_rvs,
+                                                       mask_ccf_heights,
+                                                       mask_ccf_fwhms,
+                                                       template_rvs,
+                                                       template_ccf_heights,
+                                                       template_ccf_fwhms,
+                                                       comments):
+                print(round(i, 5),
+                      round(j, 4),
+                      round(k, 4),
+                      round(l, 4),
+                      round(m, 4),
+                      round(n, 4),
+                      round(o, 4),
+                      round(p, 4),
+                      round(q, 4),
+                      round(r, 4),
+                      s)
+            if not args.no_comment:
+                update_status = raw_input('Update Status? (y/n): ')
+                if update_status == 'y':
+                    new_status = raw_input('New Status: ')
+                    updateTargetStatus(swasp_id, new_status)
+        # do this instead
+        else:
+            print('\nID: {}'.format(swasp_id))
+            print("BJD  BCV  V_TELL  MRV  MCCF_HEIGHT  MCCF_FWHM   TRV  TCCF_HEIGHT  TCC_FWHM  COMMENTS")
+            for i, j, k, l, m, n, o, p, q, r in zip(bjds,
+                                                    barycentric_velocities,
+                                                    v_tells,
+                                                    mask_rvs,
+                                                    mask_ccf_heights,
+                                                    mask_ccf_fwhms,
+                                                    template_rvs,
+                                                    template_ccf_heights,
+                                                    template_ccf_fwhms,
+                                                    comments):
+                print(round(i, 5),
+                      round(j, 4),
+                      round(k, 4),
+                      round(l, 4),
+                      round(m, 4),
+                      round(n, 4),
+                      round(o, 4),
+                      round(p, 4),
+                      round(q, 4),
+                      r)
+        plt.cla()

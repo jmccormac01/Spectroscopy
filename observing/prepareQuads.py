@@ -168,7 +168,7 @@ def getObjectsForPhaseCoverage():
     qry = """
         SELECT swasp_id, Vmag
         FROM eblm_parameters
-        WHERE current_status = 'PHASE_COVERAGE'
+        WHERE current_status = 'PHASE_COVERAGE_IDS'
         """
     with db.cursor() as cur:
         cur.execute(qry)
@@ -190,6 +190,8 @@ if __name__ == '__main__':
     JD2 = (Time(args.night2, format='isot', scale='utc', in_subfmt='date') + 1.5*u.day).jd
     # dictionary to hold the plan
     obs = {}
+    # list to hold the catalogue for TCS
+    catalogue = []
     # list to hold quads
     Q1_sched, Q2_sched = [],[]
     # get the objects from the database
@@ -274,6 +276,9 @@ if __name__ == '__main__':
                             obs[(Q1rt[k]-((exptime/2.)*u.second)).iso] = "Q1 {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(obj, int(alt_q1), round(Vmag, 1), exptime, n_spectra, int(ms_q1), int(phase_q1))
                             # append this object to a Q1 list
                             Q1_sched.append(obj)
+                            # append the object to the catalogue file
+                            if obj not in catalogue:
+                                catalogue.append(obj)
         else:
             print('Q1 done for {}, skipping'.format(obj[0]))
 
@@ -303,8 +308,14 @@ if __name__ == '__main__':
                         if Q2rt[k].jd > float(ephem.julian_date(e_twi1)) and Q2rt[k].jd < float(ephem.julian_date(m_twi1)):
                             obs[(Q2rt[k]-((exptime/2.)*u.second)).iso] = "Q2 {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(obj, int(alt_q2), round(Vmag, 1), exptime, n_spectra, int(ms_q2), int(phase_q2))
                             Q2_sched.append(obj)
+                            # append the object to the catalogue file
+                            if obj not in catalogue:
+                                catalogue.append(obj)
 
     # print the final plan
     for i in sorted(obs):
         print(i, obs[i])
 
+    print('Catalogue:')
+    for c in catalogue:
+        print(c)
