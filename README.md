@@ -7,11 +7,12 @@ Usage
 -----
 
 *Before running Spector:*
-    -   Remove all files that should not be included in reduction
-        i.e. bad flats, data from other central wavelengths or gratings etc.
-        Place all this data in a folder called 'junk'. Use *.int logfile to
-        help weed out unwanted files
-    -   Adjust the settings in the **EDIT HERE** section below
+   1. ```chmod -R ugo+rwx *``` so ```Spector``` has permission to edit the files
+   1. Remove all files that should not be included in reduction
+      i.e. bad flats, data from other central wavelengths or gratings etc.
+      Place all this data in a folder called e.g. 'junk'. Use *.int logfile to
+      help weed out unwanted files
+   1. Adjust the settings in the **EDIT HERE** section below
 
 *Assumptions:*
    1. This code was written for a particular observing strategy - Acquire, Arc, Science, Arc, repeat. Therefore the script is looking for this structure in the data when matching arcs to spectra. This can be easily changed by modifying the relevant section
@@ -48,10 +49,19 @@ into one location for RV analysis. The files from multiple nights are
 linked by their ```SWASP\_ID```. First populate the database column with
 each spectrum's ```SWASP\_ID``` using:
 
-```python setSwaspIds.py```
+```python database/setSwaspIds.py```
 
 Manually add any missing entries to the database and/or resolve naming
-or typos at the telescope. Once all the ```SWASP_ID``` keywords have been
+or typos at the telescope. 
+
+Next update the Q1 and Q2 keywords so they next observations can be planned:
+
+```python database/updateRvQuadStatus.py```
+
+use the ```--commit``` flag after checking the quads are ok. This will 
+commit them to the database
+
+Once all the ```SWASP_ID``` keywords have been updated and quads have been
 populated, gather all the spectra into per-object folders for analysis using:
 
 ```python gatherSpectraFor_iSpec.py```
@@ -66,14 +76,18 @@ To use the right CCF mask with iSpec we need to estimate the spectral type
 of the target. This can be done by getting the Teff_jh and Teff_vk from Hunter
 and then using the Teff-to-Spectral_Type translation to estimate the type
 based on the average of the two temperatures. This is not super accurate but
-should be enough to distinguish F from K or M stars. **Double check the star's
-spectral types individually before getting excited**
+should be enough to distinguish F from K or M stars.
 
 Measuring RVs with iSpec
 ------------------------
 
 Loop over all the objects with the ```iSpec_RVs.py``` script. This will
-cross correlate spectra with the first one to determine the RVs.
+cross correlate spectra with the first one to determine the RVs. A second
+cross correlation is also done with the first spectrum as a double check.
+
+By default ```iSpec_RVs.py``` will loop over all the objects that have spectra
+that have not had their RV measured. You can force it to analyse a given object
+by specifiying ```--swasp_id```.
 
 The barycentric correction is not the most accurate, but this is ok for
 initial analysis. The BCV should be calculated accurately before any detailed
@@ -82,19 +96,10 @@ analysis.
 Determining Outstanding Observations
 ------------------------------------
 
-With a partially complete dataset we do the following before each run to 
-see what observations are required. Check the Q1 and Q2 columns of each 
-object. 
+This is now done by ```updateRvQuadStatus.py``` above. Run this after each
+reduction run to always have the correct current state of the world for the
+project
 
-If !Q1 and !Q2, then try for both
-
-If !Q1 only, then do Q1 (same for Q2). 
-
-If Q1 and Q2 and dRV > 25 km/s, then flag for phase coverage
-
-If Q1 and Q2 and dRV < 25 km/s, then flag for phase coverage-stabilized
-
-Ignore all SB2, IGNORE, EB, BEB objects
 
 Dealing with blends
 -------------------

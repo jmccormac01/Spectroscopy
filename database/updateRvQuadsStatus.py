@@ -26,6 +26,7 @@ def checkQuads(swasp_id, E, P):
         image_id, hjd_mid
         FROM eblm_ids_final
         WHERE swasp_id='{}'
+        AND analyse = 1
         """.format(swasp_id)
     if args.v:
         print(qry2)
@@ -50,17 +51,25 @@ def checkQuads(swasp_id, E, P):
                 if args.v:
                     print('Q1/2 MISS...')
                 pass
+        # set the 0's again in case the period changes
+        # and the quads are no longer hit
+        # Q1
         if len(q1_list) > 0:
-            updateQuad('q1', swasp_id)
+            updateQuad('q1', swasp_id, 1)
+        else:
+            updateQuad('q1', swasp_id, 0)
+        # Q2
         if len(q2_list) > 0:
-            updateQuad('q2', swasp_id)
+            updateQuad('q2', swasp_id, 1)
+        else:
+            updateQuad('q2', swasp_id, 0)
 
-def updateQuad(quad, swasp_id):
+def updateQuad(quad, swasp_id, status):
     qry = """
         UPDATE eblm_parameters
-        SET {} = 1
+        SET {} = {}
         WHERE swasp_id='{}'
-        """.format(quad, swasp_id)
+        """.format(quad, status, swasp_id)
     if args.v:
         print(qry)
     if args.commit:
@@ -79,7 +88,6 @@ if __name__ == "__main__":
           """
     if args.v:
         print(qry)
-    quads_done = []
     with db.cursor() as cur:
         cur.execute(qry)
         for row in cur:
@@ -90,11 +98,6 @@ if __name__ == "__main__":
             Q2 = int(row[4]) if row[4] else None
             if args.v:
                 print(swasp_id, E, P, Q1, Q2)
-            if Q1 == 1 and Q2 == 1:
-                if args.v:
-                    print('Quads finished for {}, skipping...'.format(swasp_id))
-                quads_done.append(swasp_id)
-                continue
             # check the Quads
             checkQuads(swasp_id, E, P)
 

@@ -166,18 +166,39 @@ def getObjectsForPhaseCoverage():
     Just output them all with their exptimes and mags
     """
     qry = """
-        SELECT swasp_id, Vmag
+        SELECT swasp_id, Vmag, period, paramfit_spec_type
         FROM eblm_parameters
         WHERE current_status = 'PHASE_COVERAGE_IDS'
         """
+    catalogue = []
     with db.cursor() as cur:
         cur.execute(qry)
-        print('swasp_id', 'V mag', 'exptime')
+        print('swasp_id', 'V mag', 'period', 'spec_type', 'exptime')
         for row in cur:
             swasp_id = row[0]
+            period = row[2]
+            spec_type = row[3]
             mag = round(float(row[1]),2)
             exptime = getIdsExptime(mag)
-            print(swasp_id, mag, exptime)
+            print(swasp_id, mag, period, spec_type, exptime)
+            catalogue.append(swasp_id)
+    print('Catalogue:')
+    for c in catalogue:
+        printCatalogueLine(c)
+
+def printCatalogueLine(line):
+    """
+    Print ING formatted catalogue line
+    """
+
+    name = '{}'.format(line.split('1SWASP')[1])
+    ra1 = name[1:3]
+    ra2 = name[3:5]
+    ra3 = name[5:10]
+    dec1 = name[10:13]
+    dec2 = name[13:15]
+    dec3 = name[15:]
+    print("{} {} {} {} {} {} {} J2000".format(name, ra1, ra2, ra3, dec1, dec2, dec3))
 
 if __name__ == '__main__':
     if len(args.night1.split('-')) != 3 or len(args.night2.split('-')) != 3:
@@ -250,7 +271,7 @@ if __name__ == '__main__':
         # Moon, Twilight and Altitude
 
         # loop over Q1s
-        if obj[5] != 1:
+        if objects[obj][4] != 1:
             for k in range(0, len(Q1rt)):
                 if Q1rt[k].jd > JD1 and Q1rt[k].jd < JD2:
                     # moon + target location
@@ -269,6 +290,7 @@ if __name__ == '__main__':
                     e_twi1=telescope.next_setting(ephem.Sun(),use_center=True)
                     m_twi1=telescope.next_rising(ephem.Sun(),use_center=True)
 
+
                     # check moon and elevation limits
                     if ms_q1 >= MOON_ANGLE_LIMIT and alt_q1 > ELEVATION_LIMIT:
                         # if the pass check we are withing twilights
@@ -283,7 +305,7 @@ if __name__ == '__main__':
             print('Q1 done for {}, skipping'.format(obj[0]))
 
         # loop over the Q2s
-        if obj[6] != 1:
+        if objects[obj][5] != 1:
             for k in range(0, len(Q2rt)):
                 if Q2rt[k].jd > JD1 and Q2rt[k].jd < JD2:
                     # moon + target location
@@ -318,4 +340,4 @@ if __name__ == '__main__':
 
     print('Catalogue:')
     for c in catalogue:
-        print(c)
+        printCatalogueLine(c)

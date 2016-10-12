@@ -10,6 +10,10 @@ import os
 import time
 import glob as g
 import argparse as ap
+from datetime import (
+    datetime,
+    timedelta
+    )
 import numpy as np
 from ccdproc import (
     CCDData,
@@ -535,9 +539,10 @@ def logSpectraToDb():
                 utmiddle,
                 n_traces,
                 sky_pa,
-                night)
+                night,
+                analyse)
                 VALUES
-                ('{}', '{}', {}, {}, {}, '{}', {}, {}, '{}')
+                ('{}', '{}', {}, {}, {}, '{}', {}, {}, '{}', 1)
                 """.format(image_id,
                            object_name,
                            bjd_mid,
@@ -571,43 +576,45 @@ if __name__ == '__main__':
     print('---------------------------------------------------------\n')
     # get command line args
     args = argParse()
+    if args.log_only:
+        logSpectraToDb()
+        sys.exit()
     if not os.path.exists(args.refarc):
         print('{} not found, quitting'.format(args.refarc))
         sys.exit(1)
     if args.ready:
-        if not args.log_only:
-            if args.ds9:
-                # pyds9 was being a shit in astroconda env
-                # beat it into submission with direct access via xpa
-                # check for window
-                already_ds9 = checkForDs9()
-                if not already_ds9:
-                    os.system('ds9 -title fuckingds9 &')
-            # make a local backup copy of the data
-            copyFiles()
-            # get a list of images in current directory
-            images = getImageList()
-            # rename the images to make them easier to read
-            renameFiles(images)
-            # get new filenames
-            images = getImageList()
-            # make a master bias
-            master_bias = makeMasterBias(images)
-            # make a master flat
-            master_flat = makeMasterFlat(images, master_bias)
-            # correct the arcs
-            for filename in images.files_filtered(imagetyp=ARC_KEYWORD):
-                correctData(filename, master_bias, master_flat, 'arc')
-            # correct the science spectra
-            for filename in images.files_filtered(imagetyp=SCIENCE_KEYWORD):
-                correctData(filename, master_bias, master_flat, 'science')
-            cleanCalibs()
-            # extract wavelength calibrated and continuum normalised spectra
-            extractSpectra()
-            # round up the reduced spectra
-            roundUpSpectra()
-            # remove all the intermediate data products
-            eraseIntermediateProducts()
+        if args.ds9:
+            # pyds9 was being a shit in astroconda env
+            # beat it into submission with direct access via xpa
+            # check for window
+            already_ds9 = checkForDs9()
+            if not already_ds9:
+                os.system('ds9 -title fuckingds9 &')
+        # make a local backup copy of the data
+        copyFiles()
+        # get a list of images in current directory
+        images = getImageList()
+        # rename the images to make them easier to read
+        renameFiles(images)
+        # get new filenames
+        images = getImageList()
+        # make a master bias
+        master_bias = makeMasterBias(images)
+        # make a master flat
+        master_flat = makeMasterFlat(images, master_bias)
+        # correct the arcs
+        for filename in images.files_filtered(imagetyp=ARC_KEYWORD):
+            correctData(filename, master_bias, master_flat, 'arc')
+        # correct the science spectra
+        for filename in images.files_filtered(imagetyp=SCIENCE_KEYWORD):
+            correctData(filename, master_bias, master_flat, 'science')
+        cleanCalibs()
+        # extract wavelength calibrated and continuum normalised spectra
+        extractSpectra()
+        # round up the reduced spectra
+        roundUpSpectra()
+        # remove all the intermediate data products
+        eraseIntermediateProducts()
         # log the spectra to the database
         logSpectraToDb()
     else:
