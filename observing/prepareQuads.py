@@ -173,14 +173,23 @@ def getObjectsForPhaseCoverage():
     catalogue = []
     with db.cursor() as cur:
         cur.execute(qry)
-        print('swasp_id', 'V mag', 'period', 'spec_type', 'exptime')
+        print('swasp_id', 'V mag', 'period', 'spec_type', 'exptime','n_spectra')
         for row in cur:
             swasp_id = row[0]
-            period = row[2]
+            period = round(float(row[2]), 5)
             spec_type = row[3]
             mag = round(float(row[1]),2)
             exptime = getIdsExptime(mag)
-            print(swasp_id, mag, period, spec_type, exptime)
+            qry2 = """
+                SELECT count(*)
+                FROM eblm_ids_final
+                WHERE swasp_id='{}'
+                """.format(swasp_id)
+            with db.cursor() as cur2:
+                cur2.execute(qry2)
+                for row2 in cur2:
+                    count = row2[0]
+            print(swasp_id, mag, period, spec_type, exptime, count)
             catalogue.append(swasp_id)
     print('Catalogue:')
     for c in catalogue:
