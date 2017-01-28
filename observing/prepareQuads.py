@@ -19,13 +19,26 @@ from numpy.polynomial import Polynomial as P
 # connect to database
 db = pymysql.connect(host='localhost', db='eblm', password='mysqlpassword')
 
+class Range(object):
+    """
+    Range class for use with argparse
+    """
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+    def __eq__(self, other):
+        return self.start <= other <= self.end
+    def __repr__(self):
+        return '{0}-{1}'.format(self.start, self.end)
+
 def argParse():
     description = "Code to calculate QUADS for CAFE/IDS objects"
     status_choices = ["CONTINUE-CAFE",
                       "CONTINUE-STABILIZED",
                       "CONTINUE",
                       "OBSERVE",
-                      "PHASE_COVERAGE"]
+                      "PHASE_COVERAGE",
+                      "1SWASP"]
     instruments = ['CAFE', 'IDS']
     parser = ap.ArgumentParser(description=description)
     parser.add_argument('instrument',
@@ -36,7 +49,16 @@ def argParse():
                         help='Status flag to ID objects in DB')
     parser.add_argument('night1', help='YYYY-MM-DD of night1 of run')
     parser.add_argument('night2', help='YYYY-MM-DD of night2 of run')
+    parser.add_argument('--phase1',
+                        help='Orbital phase 1 to schedule',
+                        type=float, default=0.25,
+                        choices=[Range(0.0, 1.0)] )
+    parser.add_argument('--phase2',
+                        help='Orbital phase 2 to schedule',
+                        type=float, default=0.75,
+                        choices=[Range(0.0, 1.0)])
     parser.add_argument('--snr', help='Target SNR for obs', type=int, default=30)
+    parser.add_argument('--giants', help='search giants also?', action='store_true')
     return parser.parse_args()
 
 # parse the command line
@@ -109,7 +131,7 @@ def getCafeExptime(swasp_id, vmag):
         print('SNR_max @ 2700 = {0:.2f}'.format(snr_max))
         n_spectra = (args.snr/snr[V[n]][-1])**2
         print('This needs {0:.2f} spectra @ 2700'. format(n_spectra))
-        n_spectra = math.ceil(n_spectra)
+        n_spectra = int(math.ceil(n_spectra))
         print('Rounding up to next integer n_spectra = {0:d}'.format(n_spectra))
         # now work out the best exptime to use to combine 
         # n_spectra spectra to get the desired args.snr
@@ -143,7 +165,7 @@ def getIdsExptime(mag):
     n = np.where(diff == min(diff))[0][-1]
     return exptimes[n]
 
-def getObjects(status):
+def getObjects(status, giants):
     objects = {}
     qry = """
         SELECT
@@ -153,13 +175,31 @@ def getObjects(status):
         WHERE
         current_status = '{0:s}'
         """.format(status)
+    if not giants:
+        qry = qry + " AND (giant_flag IS NULL OR giant_flag != 'giant')"
     with db.cursor() as cur:
         cur.execute(qry)
         for row in cur:
             objects[row[0]] = (row[1], row[2]+2450000, row[3], row[4], row[5], row[6])
     return objects
 
-def getObjectsForPhaseCoverage():
+def getSwaspObject(swasp_id):
+    objects = {}
+    qry = """
+        SELECT
+        swasp_id, period, epoch, Vmag, paramfit_spec_type, q1, q2
+        FROM
+        eblm_parameters
+        WHERE
+        swasp_id = '{0:s}'
+        """.format(swasp_id)
+    with db.cursor() as cur:
+        cur.execute(qry)
+        for row in cur:
+            objects[row[0]] = (row[1], row[2]+2450000, row[3], row[4], row[5], row[6])
+    return objects
+
+def getObjectsForPhaseCoverage(giants):
     """
     For these objects we don't care about the time
 
@@ -170,6 +210,8 @@ def getObjectsForPhaseCoverage():
         FROM eblm_parameters
         WHERE current_status = 'PHASE_COVERAGE_IDS'
         """
+    if not giants:
+        qry = qry + " AND (giant_flag IS NULL OR giant_flag != 'giant')"
     catalogue = []
     with db.cursor() as cur:
         cur.execute(qry)
@@ -214,7 +256,7 @@ if __name__ == '__main__':
         print('Dates must have YYYY-MM-DD format')
         sys.exit(1)
     if args.status_flag == 'PHASE_COVERAGE':
-        getObjectsForPhaseCoverage()
+        getObjectsForPhaseCoverage(args.giants)
         sys.exit(0)
     JD1 = (Time(args.night1, format='isot', scale='utc', in_subfmt='date') + 0.5*u.day).jd
     JD2 = (Time(args.night2, format='isot', scale='utc', in_subfmt='date') + 1.5*u.day).jd
@@ -224,8 +266,12 @@ if __name__ == '__main__':
     catalogue = []
     # list to hold quads
     Q1_sched, Q2_sched = [],[]
-    # get the objects from the database
-    objects = getObjects(args.status_flag)
+    # get the object(s) from the database
+    if args.status_flag == '1SWASP':
+        in_swasp_id = input('Enter the swasp_id: ')
+        objects = getSwaspObject(in_swasp_id)
+    else:
+        objects = getObjects(args.status_flag, args.giants)
     for obj in objects:
         Epoch = objects[obj][1]
         Period = objects[obj][0]
@@ -267,8 +313,8 @@ if __name__ == '__main__':
         # make new lists of E (Er), Q1 (Q1r) and Q2 (Qr)
         En=ec[n[0][0]]
         Er=np.linspace(En,En+(n_periods*Period),n_periods+1)
-        Q1r=np.linspace(En+(0.25*Period),En+(0.25*Period)+(n_periods*Period),n_periods+1)
-        Q2r=np.linspace(En+(0.75*Period),En+(0.75*Period)+(n_periods*Period),n_periods+1)
+        Q1r=np.linspace(En+(args.phase1*Period),En+(args.phase1*Period)+(n_periods*Period),n_periods+1)
+        Q2r=np.linspace(En+(args.phase2*Period),En+(args.phase2*Period)+(n_periods*Period),n_periods+1)
 
         # convert the times to something usable mathematically
         Ert=Time(Er,format='jd',scale='utc')
@@ -280,7 +326,7 @@ if __name__ == '__main__':
         # Moon, Twilight and Altitude
 
         # loop over Q1s
-        if objects[obj][4] != 1:
+        if objects[obj][4] == 0 or args.phase1 != 0.25:
             for k in range(0, len(Q1rt)):
                 if Q1rt[k].jd > JD1 and Q1rt[k].jd < JD2:
                     # moon + target location
@@ -304,17 +350,17 @@ if __name__ == '__main__':
                     if ms_q1 >= MOON_ANGLE_LIMIT and alt_q1 > ELEVATION_LIMIT:
                         # if the pass check we are withing twilights
                         if Q1rt[k].jd > float(ephem.julian_date(e_twi1)) and Q1rt[k].jd < float(ephem.julian_date(m_twi1)):
-                            obs[(Q1rt[k]-((exptime/2.)*u.second)).iso] = "Q1 {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(obj, int(alt_q1), round(Vmag, 1), exptime, n_spectra, int(ms_q1), int(phase_q1))
+                            obs[(Q1rt[k]-((exptime/2.)*u.second)).iso] = "Ph{} {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(round(args.phase1, 2), obj, int(alt_q1), round(Vmag, 1), exptime, n_spectra, int(ms_q1), int(phase_q1))
                             # append this object to a Q1 list
                             Q1_sched.append(obj)
                             # append the object to the catalogue file
                             if obj not in catalogue:
                                 catalogue.append(obj)
         else:
-            print('Q1 done for {}, skipping'.format(obj[0]))
+            print('Ph{} done for {}, skipping'.format(round(args.phase1, 2), obj))
 
         # loop over the Q2s
-        if objects[obj][5] != 1:
+        if objects[obj][5] == 0 or args.phase2 != 0.75:
             for k in range(0, len(Q2rt)):
                 if Q2rt[k].jd > JD1 and Q2rt[k].jd < JD2:
                     # moon + target location
@@ -337,11 +383,13 @@ if __name__ == '__main__':
                     if ms_q2 >= MOON_ANGLE_LIMIT and alt_q2 > ELEVATION_LIMIT:
                         # if the pass check we are withing twilights
                         if Q2rt[k].jd > float(ephem.julian_date(e_twi1)) and Q2rt[k].jd < float(ephem.julian_date(m_twi1)):
-                            obs[(Q2rt[k]-((exptime/2.)*u.second)).iso] = "Q2 {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(obj, int(alt_q2), round(Vmag, 1), exptime, n_spectra, int(ms_q2), int(phase_q2))
+                            obs[(Q2rt[k]-((exptime/2.)*u.second)).iso] = "Ph{} {} alt={} V={} Texp={}x{} MoonSep={} MoonIll={}%".format(round(args.phase2, 2), obj, int(alt_q2), round(Vmag, 1), exptime, n_spectra, int(ms_q2), int(phase_q2))
                             Q2_sched.append(obj)
                             # append the object to the catalogue file
                             if obj not in catalogue:
                                 catalogue.append(obj)
+        else:
+            print('Ph{} done for {}, skipping'.format(round(args.phase2, 2), obj))
 
     # print the final plan
     for i in sorted(obs):
