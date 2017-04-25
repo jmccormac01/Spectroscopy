@@ -2,8 +2,10 @@
 Spector - A tool for extracting 1D spectra from INT/IDS
 
 TODO:
-    Implemnet cosmic ray rejection
     Implement a way to do the blends at the same time
+        - This can be done at the step where we set the
+          swasp_id. Leave this comment here until that
+          has been done.
 """
 import sys
 import os
