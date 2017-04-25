@@ -49,8 +49,8 @@ except NameError:
 #################################
 
 # file locations
-lineList_location = "/Users/James/Documents/LineLists/cuar_cune.dat"
-loginCl_location = "/Users/James/"
+lineList_location = "/Users/jmcc/Dropbox/LineLists/cuar_cune.dat"
+loginCl_location = "/Users/jmcc/"
 # CCD params
 GAIN = "1.03"
 RDNOISE = "3.48"
@@ -167,6 +167,28 @@ def makeMasterBias(images):
         except IndexError:
             return None
 
+def estimateSkyLevel(data):
+    """
+    Function to interatively sigma clip the sky background
+    to estimate the sky level without the influence of stars
+    """
+    mean_diff = 1E6
+    mean_diff_limit = 1E-6
+    sigma = 3
+    # create a masked array where nothing is masked
+    data = np.ma.masked_where(data < -1E6, data)
+    i = 0
+    while mean_diff > mean_diff_limit:
+        mean = np.ma.average(data)
+        rms = np.ma.std(data)
+        masked_data = np.ma.masked_where(((data > mean+sigma*rms) | (data < mean-sigma*rms)), data)
+        new_mean = np.ma.average(masked_data)
+        new_rms = np.ma.std(masked_data)
+        print('Sky level: {}, RMS: {}'.format(new_mean, new_rms))
+        data = masked_data
+        mean_diff = abs(new_mean-mean)/new_mean
+    return new_mean, new_rms
+
 def makeMasterFlat(images, master_bias):
     """
     Flats are corrected for their bias level (if
@@ -192,6 +214,8 @@ def makeMasterFlat(images, master_bias):
                 ccd = subtract_bias(ccd, master_bias)
             else:
                 print('No master bias, skipping correction...')
+            sky_level, sky_rms = estimateSkyLevel(ccd.data)
+            ccd.data = ccd.data/sky_level
             flat_list.append(ccd)
         try:
             master_flat = combine(flat_list, method='median')
@@ -355,9 +379,9 @@ def extractSpectra():
     iraf.apall.setParam('usigma', '4.0')
     iraf.apall.setParam('nsubaps', '1')
     iraf.apall.saveParList(filename="apall.pars")
-    iradf.identify.setParam('fwidth', '2.')
-    iradf.identify.setParam('order', '4')
-    iradf.identify.setParam('niterate', '7')
+    iraf.identify.setParam('fwidth', '2.')
+    iraf.identify.setParam('order', '4')
+    iraf.identify.setParam('niterate', '7')
     iraf.apall.saveParList(filename="identify.pars")
 
     # make reference arc for reidentify
@@ -535,7 +559,7 @@ def logSpectraToDb():
         pa = hdr['ROTSKYPA']
         n_traces = d.shape[1]
         night = utmiddleToNight(utmiddle)
-        qry = """REPLACE INTO eblm_ids_final
+        qry = """REPLACE INTO eblm_ids_newest
                 (image_id,
                 object_name,
                 bjd_mid,
