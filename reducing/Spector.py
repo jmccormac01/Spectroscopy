@@ -2,7 +2,8 @@
 Spector - A tool for extracting 1D spectra from INT/IDS
 
 TODO:
-    Implement a way to do partial reductions
+    Implement a way to do the blends at the same time
+    Fix the flat field normalisation
 
 """
 import sys
@@ -354,6 +355,10 @@ def extractSpectra():
     iraf.apall.setParam('usigma', '4.0')
     iraf.apall.setParam('nsubaps', '1')
     iraf.apall.saveParList(filename="apall.pars")
+    iradf.identify.setParam('fwidth', '2.')
+    iradf.identify.setParam('order', '4')
+    iradf.identify.setParam('niterate', '7')
+    iraf.apall.saveParList(filename="identify.pars")
 
     # make reference arc for reidentify
     if '.' in args.refarc:
@@ -429,7 +434,7 @@ def extractSpectra():
             print("\nIdentify arc lines:")
             print("Enter the following in the splot window")
             print("\t:thres 500")
-            print("\t:order 1, max = 3")
+            print("\t:order 4, max = 5")
             print("\tfwidth 2")
             print("Select 3-5 arc lines from line atlas")
             print("Press 'm' to mark, then enter wavelength")
