@@ -373,7 +373,7 @@ def extractSpectra():
         target_id = prihdr['CAT-NAME']
         spectrum_id = int(templist[i].split('_')[2].split('r')[1])
         if args.ds9:
-            os.system('xpaset fuckingds9 fits < {}'.format(templist[i]))
+            os.system('xpaset SpectorDS9 fits < {}'.format(templist[i]))
         # extract the object spectrum
         print("[{}/{}] Extracting spectrum of {} from image {}".format(i+1, len(templist), target_id, templist[i]))
         print("[{}/{}] Check aperture and background. Change if required".format(i+1, len(templist)))
@@ -564,11 +564,11 @@ def logSpectraToDb():
 
 def checkForDs9():
     """
-    Find fuckingds9
+    Find SpectorDS9
     """
-    processes = os.popen('ps aux | grep fuckingds9').readlines()
+    processes = os.popen('ps aux | grep SpectorDS9').readlines()
     for process in processes:
-        if "ds9 -title fuckingds9" in process:
+        if "ds9 -title SpectorDS9" in process:
             print('Hurray!')
             return True
     else:
@@ -594,7 +594,7 @@ if __name__ == '__main__':
             # check for window
             already_ds9 = checkForDs9()
             if not already_ds9:
-                os.system('ds9 -title fuckingds9 &')
+                os.system('ds9 -title SpectorDS9 &')
         # make a local backup copy of the data
         copyFiles()
         # get a list of images in current directory
