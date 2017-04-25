@@ -49,6 +49,8 @@ into one location for RV analysis. The files from multiple nights are
 linked by their ```SWASP\_ID```. First populate the database column with
 each spectrum's ```SWASP\_ID``` using:
 
+# WE NEED TO FIX BLENDS HERE! SET THEIR SWASPIDS RIGHT AWAY TO NOT LEAVE THEM BEHIND!
+
 ```python database/setSwaspIds.py```
 
 Manually add any missing entries to the database and/or resolve naming

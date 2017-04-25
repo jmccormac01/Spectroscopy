@@ -2,9 +2,8 @@
 Spector - A tool for extracting 1D spectra from INT/IDS
 
 TODO:
+    Implemnet cosmic ray rejection
     Implement a way to do the blends at the same time
-    Fix the flat field normalisation
-
 """
 import sys
 import os
@@ -22,7 +21,8 @@ from ccdproc import (
     combine,
     subtract_bias,
     flat_correct,
-    trim_image
+    trim_image,
+    cosmicray_lacosmic
     )
 from astropy.io import fits
 from astropy import units as u
@@ -276,6 +276,8 @@ def correctData(filename, master_bias, master_flat, filetype):
             hdr['JD-MID'] = jd_mid.jd
             hdr['UT-MID'] = jd_mid.isot
     ccd = CCDData.read(filename, unit=u.adu)
+    # correct for cosmic rays here
+    ccd = cosmicray_lacosmic(ccd)
     if master_bias:
         ccd = subtract_bias(ccd, master_bias)
     else:
