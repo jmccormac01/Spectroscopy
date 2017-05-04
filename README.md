@@ -1,10 +1,13 @@
-Spector
-------
+Spectroscopy
+-------------
 
-A package for reducing long-slit IDS data
+Spectroscopy is carried out using 1 of two codes depending on the instrument.
 
-Usage
------
+   1. Spector is a package for reducing long-slit IDS data
+   1. For echelle spectra we use the [CERES](https://github.com/rabrahm/ceres) package from Rafael Brahm. *Update these docs to include CAFE/FIES info?*
+
+Spector Usage
+-------------
 
 *Before running Spector:*
    1. ```chmod -R ugo+rwx *``` so ```Spector``` has permission to edit the files

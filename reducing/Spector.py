@@ -6,6 +6,10 @@ TODO:
         - This can be done at the step where we set the
           swasp_id. Leave this comment here until that
           has been done.
+        - Use the split fits file method for the multiple traces
+        - Keep n_traces = total n_traces for each trace in db
+        - Set the swasp_id during the matching, right away
+        - Reduce a test set from start to finish before doing them all
 """
 import sys
 import os
@@ -501,11 +505,10 @@ def extractSpectra():
         iraf.continuum(input=spectrum_out,
                        output=normspec_out,
                        logfile="logfile",
-                       interac="yes",
                        functio="spline3",
                        order="5",
                        niterat="10",
-                       markrej="yes")
+                       markrej="yes") #interac="yes",
         print("\n\n")
 
 def roundUpSpectra():
@@ -556,6 +559,7 @@ def logSpectraToDb():
         d = h[0].data
         image_id = i
         object_name = hdr['OBJECT']
+        camera_id = hdr['DETECTOR']
         hjd_mid = hdr['HJD-MID']
         bjd_mid = hdr['BJD-MID']
         jd_mid = hdr['JD-MID']
@@ -565,6 +569,7 @@ def logSpectraToDb():
         night = utmiddleToNight(utmiddle)
         qry = """REPLACE INTO eblm_ids_newest
                 (image_id,
+                camera_id,
                 object_name,
                 bjd_mid,
                 hjd_mid,
@@ -575,8 +580,9 @@ def logSpectraToDb():
                 night,
                 analyse)
                 VALUES
-                ('{}', '{}', {}, {}, {}, '{}', {}, {}, '{}', 1)
+                ('{}', '{}', '{}', {}, {}, {}, '{}', {}, {}, '{}', 1)
                 """.format(image_id,
+                           camera_id,
                            object_name,
                            bjd_mid,
                            hjd_mid,
