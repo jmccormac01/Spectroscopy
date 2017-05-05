@@ -388,7 +388,7 @@ def extractSpectra():
     iraf.apall.setParam('nsubaps', '1')
     iraf.apall.saveParList(filename="apall.pars")
     iraf.identify.setParam('fwidth', '2.')
-    iraf.identify.setParam('order', '4')
+    iraf.identify.setParam('order', '1')
     iraf.identify.setParam('niterate', '7')
     iraf.apall.saveParList(filename="identify.pars")
 
