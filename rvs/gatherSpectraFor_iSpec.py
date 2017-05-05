@@ -13,7 +13,7 @@ from datetime import timedelta
 import pymysql
 
 # set up the per object master directory
-top_dir = '/Users/James/Dropbox/data/int/ids/eblm'
+top_dir = '/Users/jmcc/Dropbox/data/int/ids/eblm'
 iSpec_dir = '{}/all_spectra'.format(top_dir)
 if not os.path.exists(iSpec_dir):
     os.mkdir(iSpec_dir)
@@ -40,7 +40,7 @@ def getUniqueTargetList():
     """
     qry = """
         SELECT distinct(swasp_id)
-        FROM eblm_ids_final
+        FROM eblm_ids_newest
         WHERE swasp_id IS NOT NULL
         """
     swasp_ids = []
@@ -57,7 +57,7 @@ def getUniqueRvStandards():
     """
     qry = """
         SELECT distinct(object_name)
-        FROM eblm_ids_final
+        FROM eblm_ids_newest
         WHERE object_name LIKE 'HD%'
         """
     rv_stds = []
@@ -85,13 +85,13 @@ def gatherAllTargetSpectra(target_id):
     if '1SWASP' in target_id:
         qry = """
             SELECT image_id,night
-            FROM eblm_ids_final
+            FROM eblm_ids_newest
             WHERE swasp_id = '{}'
             """.format(target_id)
     elif target_id.startswith('HD'):
         qry = """
             SELECT image_id,night
-            FROM eblm_ids_final
+            FROM eblm_ids_newest
             WHERE object_name = '{}'
             """.format(target_id)
     else:

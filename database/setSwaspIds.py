@@ -27,7 +27,7 @@ def getObjectsImageIds():
     objects = defaultdict(list)
     qry = """
         SELECT image_id, object_name, night
-        FROM eblm_ids_final
+        FROM eblm_ids_newest
         WHERE swasp_id IS NULL
         """
     with db.cursor() as cur:
@@ -78,7 +78,7 @@ def updateDatabaseSwaspIds(object_name, swasp_id):
     update the database now
     """
     qry = """
-        UPDATE eblm_ids_final
+        UPDATE eblm_ids_newest
         SET swasp_id = '{}'
         WHERE object_name = '{}'
         """.format(swasp_id, object_name)

@@ -52,12 +52,10 @@ into one location for RV analysis. The files from multiple nights are
 linked by their ```SWASP\_ID```. First populate the database column with
 each spectrum's ```SWASP\_ID``` using:
 
-# WE NEED TO FIX BLENDS HERE! SET THEIR SWASPIDS RIGHT AWAY TO NOT LEAVE THEM BEHIND!
-
 ```python database/setSwaspIds.py```
 
 Manually add any missing entries to the database and/or resolve naming
-or typos at the telescope. 
+or typos at the telescope. Add the ```--update`` flag to update the database
 
 Next update the Q1 and Q2 keywords so they next observations can be planned:
 
@@ -73,6 +71,12 @@ populated, gather all the spectra into per-object folders for analysis using:
 
 This gets the unique list of targets from the database and puts all the 
 spectra together in one folder per object ready for analysis with iSpec.
+Add the ```--copy``` flag to copy the data to the combined area.
+
+Dealing with blends
+-------------------
+
+# WE NEED TO FIX BLENDS HERE! SET THEIR SWASPIDS RIGHT AWAY TO NOT LEAVE THEM BEHIND!
 
 Estimating Spectral Type
 ------------------------
@@ -104,12 +108,6 @@ Determining Outstanding Observations
 This is now done by ```updateRvQuadStatus.py``` above. Run this after each
 reduction run to always have the correct current state of the world for the
 project
-
-
-Dealing with blends
--------------------
-
-Need to determine a way to treat blends properly
 
 Schema for database table
 -------------------------

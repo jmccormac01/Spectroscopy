@@ -24,7 +24,7 @@ if not args.debug:
 
 # populate the eblm parameters table
 if args.populate:
-    base_dir="/Users/James/Documents/Observing/INTObs/EBLM/201508_09"
+    base_dir="/Users/jmcc/Dropbox/Observing/INTObs/EBLM/201508_09"
     orca_file="%s/EBLMS_orca_combined.txt" % (base_dir)
     spectype_file="%s/TargetsDescription.txt" % (base_dir) 
     

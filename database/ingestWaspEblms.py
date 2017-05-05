@@ -9,7 +9,7 @@ import pymysql
 
 db = pymysql.connect(host='localhost', db='eblm')
 
-eblm_file = '/Users/James/Documents/Observing/INTObs/EBLM/201608_10/eblms.csv'
+eblm_file = '/Users/jmcc/Dropbox/Observing/INTObs/EBLM/201608_10/eblms.csv'
 f = open(eblm_file, 'r').readlines()
 # skip the title row
 for i in range(1, len(f)):

@@ -16,7 +16,7 @@ def argParse():
                         help='increased verbosity',
                         action='store_true')
     parser.add_argument('--commit',
-                        help='do not commit changes to the database',
+                        help='commit changes to the database',
                         action='store_true')
     return parser.parse_args()
 

@@ -559,7 +559,6 @@ def logSpectraToDb():
         d = h[0].data
         image_id = i
         object_name = hdr['OBJECT']
-        camera_id = hdr['DETECTOR']
         hjd_mid = hdr['HJD-MID']
         bjd_mid = hdr['BJD-MID']
         jd_mid = hdr['JD-MID']
@@ -569,7 +568,6 @@ def logSpectraToDb():
         night = utmiddleToNight(utmiddle)
         qry = """REPLACE INTO eblm_ids_newest
                 (image_id,
-                camera_id,
                 object_name,
                 bjd_mid,
                 hjd_mid,
@@ -580,9 +578,8 @@ def logSpectraToDb():
                 night,
                 analyse)
                 VALUES
-                ('{}', '{}', '{}', {}, {}, {}, '{}', {}, {}, '{}', 1)
+                ('{}', '{}', {}, {}, {}, '{}', {}, {}, '{}', 1)
                 """.format(image_id,
-                           camera_id,
                            object_name,
                            bjd_mid,
                            hjd_mid,
