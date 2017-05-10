@@ -226,6 +226,10 @@ if __name__ == "__main__":
         blends = getBlendedSpectra()
     # get a list of partially mapped blends, if any
     partial_blend_map = getPartialBlendMap()
+    # this section is for sorting the blends into their
+    # correct swasp_ids. Make a list of matching traces to swasp_ids
+    # see blend_map_ids_2017back for an example
+    # once this file is complete for all blends, we split the multispec files
     if len(blends) > 0:
         # now go into each swasp directory and pull up the
         # finding chart for that object and cycle through the blends spectra
