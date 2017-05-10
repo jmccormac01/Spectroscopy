@@ -4,18 +4,12 @@ and atomic line lists. Corrects for barycentric
 velocity and telluric features before doing the
 cross correlation
 
-I had a hard time getting the absolute RVs to agree
-with the numbers coming from CERES/CAFE. I assumed they
-were right and then found the following way to get the
-RVS to agree (mostly). The relative offsets (which are
-the most important) were fine from the old method, this 
-is to get the absolute RVs to agree.
-
-    1. Measure velocity wrt Tellurics
-    1. Correct this velocity
+Steps:
     1. Measure barycentric velocity
-    1. Apply -BCV to Telluric corrected spectrum
+    1. Measure velocity wrt Tellurics
     1. Measure RVs with atomic line mask
+    1. Sum these 4 velocities to get the final
+       radial velocity
 
 TODO:
     Finalise the system for analysing the blends
@@ -32,7 +26,7 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation
 import astropy.units as u
-iSpec_location = '/home/virtual/shared/iSpec'
+iSpec_location = '/home/virtual/iSpec'
 sys.path.insert(0, os.path.abspath(iSpec_location))
 import ispec
 
@@ -121,7 +115,7 @@ def getSwaspIds():
     swasp_ids = []
     qry = """
         SELECT distinct(swasp_id)
-        FROM eblm_ids_final
+        FROM eblm_ids_newest
         WHERE barycentric_velocity_iSpec IS NULL
         AND swasp_id IS NOT NULL
         ORDER BY swasp_id
@@ -143,7 +137,7 @@ def isThisABlend(swasp_id, epoch, period):
     n_traces, phase, image_ids, utmiddle = [], [], [], []
     qry = """
         SELECT n_traces, bjd_mid, image_id, utmiddle
-        FROM eblm_ids_final
+        FROM eblm_ids_newest
         WHERE swasp_id ='{}'
         """.format(swasp_id)
     with db.cursor() as cur:
@@ -172,7 +166,7 @@ def getDateObs(spec):
     """
     qry = """
         SELECT utmiddle, n_traces
-        FROM eblm_ids_final
+        FROM eblm_ids_newest
         WHERE image_id='{}'
         """.format(spec)
     with db.cursor() as cur:
@@ -306,11 +300,11 @@ def getBarycentricVelocity(dateobs, coords):
     """
     return ispec.calculate_barycentric_velocity_correction(dateobs, coords)
 
-def correctBarycentricVelocity(spectrum, barycentric_velocity):
-    """
-    Correct the spectrum to the barycentre
-    """
-    return ispec.correct_velocity(spectrum, barycentric_velocity)
+#def correctBarycentricVelocity(spectrum, barycentric_velocity):
+#    """
+#    Correct the spectrum to the barycentre
+#    """
+#    return ispec.correct_velocity(spectrum, barycentric_velocity)
 
 def cleanTelluricRegions(spec):
     """
@@ -324,7 +318,7 @@ def cleanTelluricRegions(spec):
                                                   linelist_telluric, \
                                                   lower_velocity_limit=-100, \
                                                   upper_velocity_limit=100, \
-                                                  velocity_step=0.25, \
+                                                  velocity_step=0.10, \
                                                   mask_size=2.0, \
                                                   mask_depth=0.01, \
                                                   fourier=False, \
@@ -349,43 +343,18 @@ def cleanTelluricRegions(spec):
     clean_spec = spec[~tfilter]
     return bv, bv_err, clean_spec
 
-def measureRadialVelocityWithTemplate(spec, ref_spec):
-    """
-    Radial velocity measurement using a reference spectrum
-    of the same object
-
-    Based on example.py determine_radial_velocity_with_template() function
-    """
-    models, ccf = ispec.cross_correlate_with_template(spec, \
-                                                      ref_spec, \
-                                                      lower_velocity_limit=-200, \
-                                                      upper_velocity_limit=200, \
-                                                      velocity_step=0.25, \
-                                                      fourier=False)
-
-    # Number of models represent the number of components
-    components = len(models)
-    # First component:
-    try:
-        rv = np.round(models[0].mu(), 2) # km/s
-        rv_err = np.round(models[0].emu(), 2) # km/s
-    except IndexError:
-        print '\n\n\nPROBLEM RV WITH TEMPLATE, SKIPPING...\n\n\n'
-        return 0.0, 0.0, 0, None, None
-    return rv, rv_err, components, models, ccf
-
 def measureRadialVelocityWithMask(spec, mask_type):
     """
     Radial velocity measurement using atomic line list
 
     Based on example.py determine_radial_velocity_with_mask() function
     """
-    ccf_mask = ispec.read_linelist_mask(atomicMaskLines[mask_type])
+    ccf_mask = ispec.read_cross_correlation_mask(atomicMaskLines[mask_type])
     models, ccf = ispec.cross_correlate_with_mask(spec, \
                                                   ccf_mask, \
                                                   lower_velocity_limit=-200, \
                                                   upper_velocity_limit=200, \
-                                                  velocity_step=0.25, \
+                                                  velocity_step=0.10, \
                                                   mask_depth=0.01, \
                                                   fourier=False)
 
@@ -435,11 +404,6 @@ def logRVsToDb(spectrum,
                mask_ccf_fwhm,
                mask_rv,
                mask_rv_err,
-               template,
-               template_ccf_height,
-               template_ccf_fwhm,
-               template_rv,
-               template_rv_err,
                v_tell,
                v_tell_err,
                barycentric_velocity,
@@ -448,17 +412,12 @@ def logRVsToDb(spectrum,
     Insert the values from iSpec to the database
     """
     qry = """
-        UPDATE eblm_ids_final SET
+        UPDATE eblm_ids_newest SET
         mask = '{}',
         mask_ccf_height = {},
         mask_ccf_fwhm = {},
         mask_velocity = {},
         mask_velocity_err = {},
-        template = '{}',
-        template_ccf_height = {},
-        template_ccf_fwhm = {},
-        template_velocity = {},
-        template_velocity_err = {},
         telluric_velocity = {},
         telluric_velocity_err = {},
         barycentric_velocity_iSpec = {},
@@ -470,11 +429,6 @@ def logRVsToDb(spectrum,
                    mask_ccf_fwhm,
                    mask_rv,
                    mask_rv_err,
-                   template,
-                   template_ccf_height,
-                   template_ccf_fwhm,
-                   template_rv,
-                   template_rv_err,
                    v_tell,
                    v_tell_err,
                    barycentric_velocity,
@@ -520,7 +474,7 @@ if __name__ == '__main__':
     host_ip = getHostIP()
     db = pymysql.connect(host=host_ip,
                          db='eblm',
-                         user='James',
+                         user='jmcc',
                          password='mysqlpassword')
     # get a list of spectral types and the atomic mask
     # line list indexes. this is used to ID the best mask
@@ -564,9 +518,7 @@ if __name__ == '__main__':
         results = {}
         bjds, phase, comments = [], [], []
         mask_rvs, mask_rvs_errs = [], []
-        template_rvs, template_rvs_errs = [], []
         mask_ccf_heights, mask_ccf_fwhms = [], []
-        template_ccf_heights, template_ccf_fwhms = [], []
         v_tells, v_tell_errs = [], []
         barycentric_velocities = []
         abs_rvs = []
@@ -631,38 +583,15 @@ if __name__ == '__main__':
             v_tell, v_tell_err, spec = cleanTelluricRegions(spec)
             v_tells.append(v_tell)
             v_tell_errs.append(v_tell_err)
-            # correct the velocity relative to the tellurics
-            spec = correctBarycentricVelocity(spec, v_tell)
-            print('{} Telluric velocity correction applied...'.format(spectrum))
             print('{} Tellurics regions cleaned...'.format(spectrum))
             print('v_Tell = {} v_Tell_err = {}'.format(v_tell, v_tell_err))
             if args.plot:
                 ax_spec.plot(spec['waveobs'], spec['flux'], 'b-')
                 ax_spec.set_xlabel('Wavelength (nm)')
 
-            # correct the spectrum to the barycentre
-            spec = correctBarycentricVelocity(spec, -barycentric_velocity)
-            print('{} Barycentric velocity correction applied...'.format(spectrum))
-            if args.plot:
-                ax_spec.plot(spec['waveobs'], spec['flux'], 'g-')
-                ax_spec.set_xlabel('Wavelength (nm)')
-
-            # now all the steps have been done
-            # take the first spectrum as the reference for
-            # template cross correlations
-            if spec_id == 0:
-                reference_spectrum = spec
-                reference_spectrum_id = spectrum
-                print('{} is the template spectrum for this object'.format(spectrum))
-                ax_template_rv = plt.subplot2grid((6, 4), (2, 2), colspan=2, rowspan=2)
-                ax_template_rv.set_title('RV wrt {}'.format(reference_spectrum_id))
-                ax_template_ccf = plt.subplot2grid((6, 4), (4, 2), colspan=2, rowspan=2)
-                ax_template_ccf.set_title('CCF wrt {}'.format(reference_spectrum_id))
-            if args.plot:
-                ax_spec.plot(spec['waveobs'], spec['flux'], 'k-')
-
             # measure the radial velocity using a atomic mask line list
-            mask_rv, mask_rv_err, mask_components, mask_models, mask_ccf = measureRadialVelocityWithMask(spec, mask_type)
+            mask_rv, mask_rv_err, mask_components, mask_models, \
+            mask_ccf = measureRadialVelocityWithMask(spec, mask_type)
             print('{} Cross correlated with {} mask...'.format(spectrum, mask_type))
             if mask_components < 1:
                 mask_ccf_height = 1.0
@@ -680,35 +609,13 @@ if __name__ == '__main__':
             mask_rvs.append(mask_rv)
             mask_rvs_errs.append(mask_rv_err)
 
-            # measure the radial velocity using a the first spectrum
-            # as a reference spectrum
-            template_rv, template_rv_err, template_components, template_models, template_ccf = measureRadialVelocityWithTemplate(spec, reference_spectrum)
-            print('{} Cross correlated with {}...'.format(spectrum, reference_spectrum_id))
-            if template_components < 1:
-                template_ccf_height = 1.0
-                template_ccf_heights.append(template_ccf_height)
-                template_ccf_fwhm = 50.0
-                template_ccf_fwhms.append(template_ccf_fwhm)
-            else:
-                template_ccf_height = min(template_ccf['y'])
-                template_ccf_heights.append(template_ccf_height)
-                template_ccf_fwhm = template_models[0].sig()
-                template_ccf_fwhms.append(template_ccf_fwhm)
-                if args.plot:
-                    ax_template_ccf.plot(template_ccf['x'], template_ccf['y'], 'r-')
-                    ax_template_ccf.set_xlabel('Velocity (km/s)')
-            template_rvs.append(template_rv)
-            template_rvs_errs.append(template_rv_err)
-
             # make a dictionary of the results
             results[bjd.jd] = (dateobs, \
                                barycentric_velocity, \
                                v_tell, \
                                v_tell_err, \
                                mask_rv, \
-                               mask_rv_err, \
-                               template_rv, \
-                               template_rv_err)
+                               mask_rv_err)
             bjds.append(bjd.jd)
 
             if not swasp_id.startswith('HD'):
@@ -720,9 +627,6 @@ if __name__ == '__main__':
                     ax_mask_rv.set_xlim(0, 1)
                     ax_mask_rv.errorbar(phase, mask_rvs, yerr=mask_rvs_errs, fmt='r.')
                     ax_mask_rv.set_xlabel('Orbital Phase')
-                    ax_template_rv.set_xlim(0, 1)
-                    ax_template_rv.errorbar(phase, template_rvs, yerr=template_rvs_errs, fmt='r.')
-                    ax_template_rv.set_xlabel('Orbital Phase')
                     plt.show()
 
             # print per-spectrum mask summary
@@ -733,14 +637,6 @@ if __name__ == '__main__':
                   round(mask_rv_err, 4),
                   round(mask_ccf_height, 4),
                   round(mask_ccf_fwhm, 4))
-            # print per-spectrum template summary
-            print('Refspec: {}'.format(reference_spectrum_id),
-                  swasp_id,
-                  spectrum,
-                  round(template_rv, 4),
-                  round(template_rv_err, 4),
-                  round(template_ccf_height, 4),
-                  round(template_ccf_fwhm, 4))
 
             if not args.no_comment:
                 # get a comment about the spectrum
@@ -753,26 +649,18 @@ if __name__ == '__main__':
             else:
                 comments.append('nc')
 
-            # DO NOT TURN THIS BACK ON UNITL:
-            #       PYLINT - FINAL
-            #       PROPER CHECK OF ALL CODE
-            #       FINAL CONFIRMATION WITH KNOWN RV OBJECTS
             # log all the info plus comment to the database
-            logRVsToDb(spectrum,
-                       mask_type,
-                       mask_ccf_height,
-                       mask_ccf_fwhm,
-                       mask_rv,
-                       mask_rv_err,
-                       reference_spectrum_id,
-                       template_ccf_height,
-                       template_ccf_fwhm,
-                       template_rv,
-                       template_rv_err,
-                       v_tell,
-                       v_tell_err,
-                       barycentric_velocity,
-                       comment)
+            print('WARNING, NOT LOGGING RVS TO DB!')
+            #logRVsToDb(spectrum,
+            #           mask_type,
+            #           mask_ccf_height,
+            #           mask_ccf_fwhm,
+            #           mask_rv,
+            #           mask_rv_err,
+            #           v_tell,
+            #           v_tell_err,
+            #           barycentric_velocity,
+            #           comment)
 
         # don't do this for standard stars
         if not swasp_id.startswith('HD'):
@@ -783,29 +671,18 @@ if __name__ == '__main__':
                                                                  mask_type))
             print("Epoch: {} Period: {}".format(round(epoch, 6), round(period, 6)))
             print("Current Status: {}".format(current_status))
-            print("BJD             PHASE   BCV    V_TELL   MRV  M_HEIGHT  M_FWHM   TRV  T_HEIGHT  T_FWHM  COMMENTS")
-            for i, j, k, l, m, n, o, p, q, r, s in zip(bjds,
-                                                       phase,
-                                                       barycentric_velocities,
-                                                       v_tells,
-                                                       mask_rvs,
-                                                       mask_ccf_heights,
-                                                       mask_ccf_fwhms,
-                                                       template_rvs,
-                                                       template_ccf_heights,
-                                                       template_ccf_fwhms,
-                                                       comments):
-                print(round(i, 5),
-                      round(j, 4),
-                      round(k, 4),
-                      round(l, 4),
-                      round(m, 4),
-                      round(n, 4),
-                      round(o, 4),
-                      round(p, 4),
-                      round(q, 4),
-                      round(r, 4),
-                      s)
+            print("BJD             PHASE   BCV    V_TELL   RV  CCF  FWHM  COMMENTS")
+            for i, j, k, l, m, n, o, p in zip(bjds,
+                                              phase,
+                                              barycentric_velocities,
+                                              v_tells,
+                                              mask_rvs,
+                                              mask_ccf_heights,
+                                              mask_ccf_fwhms,
+                                              comments):
+                print(round(i, 5), round(j, 4), round(k, 4),
+                      round(l, 4), round(m, 4), round(n, 4),
+                      round(o, 4), p)
             if not args.no_comment:
                 update_status = raw_input('Update Status? (y/n): ')
                 if update_status == 'y':
@@ -814,25 +691,15 @@ if __name__ == '__main__':
         # do this instead
         else:
             print('\nID: {}'.format(swasp_id))
-            print("BJD  BCV  V_TELL  MRV  MCCF_HEIGHT  MCCF_FWHM   TRV  TCCF_HEIGHT  TCC_FWHM  COMMENTS")
-            for i, j, k, l, m, n, o, p, q, r in zip(bjds,
-                                                    barycentric_velocities,
-                                                    v_tells,
-                                                    mask_rvs,
-                                                    mask_ccf_heights,
-                                                    mask_ccf_fwhms,
-                                                    template_rvs,
-                                                    template_ccf_heights,
-                                                    template_ccf_fwhms,
-                                                    comments):
-                print(round(i, 5),
-                      round(j, 4),
-                      round(k, 4),
-                      round(l, 4),
-                      round(m, 4),
-                      round(n, 4),
-                      round(o, 4),
-                      round(p, 4),
-                      round(q, 4),
-                      r)
+            print("BJD  BCV  V_TELL  RV  CCF  FWHM   COMMENTS")
+            for i, j, k, l, m, n, o in zip(bjds,
+                                           barycentric_velocities,
+                                           v_tells,
+                                           mask_rvs,
+                                           mask_ccf_heights,
+                                           mask_ccf_fwhms,
+                                           comments):
+                print(round(i, 5), round(j, 4), round(k, 4),
+                      round(l, 4), round(m, 4), round(n, 4),
+                      o)
         plt.cla()

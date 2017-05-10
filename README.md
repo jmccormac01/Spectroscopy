@@ -76,6 +76,24 @@ Add the ```--copy``` flag to copy the data to the combined area.
 Dealing with blends
 -------------------
 
+Blends are spectra that contain two or more traces. The traces have to be
+asigned to the correct swasp_id. To do this we use the ```blends/correctBlands2.py``` 
+script. This plots each spectrum for a given object along with a finding chart
+set to the correct PA to identify the traces. This is a manual step. You must:
+   1. Run ```blends/correctBlends2.py```
+   1. Make a file containing the following on each line, in order:
+      a. swasp_id (this is the main target ID from the header)
+      a. image_id
+      a. t1_swasp_id
+      a. t2_swasp_id
+      a. t3_swasp_id
+   1. Add any new blended objects to the ```eblm\_parameters``` mysql table
+
+This file is then used to split up the mulitspec files into per object single 1D 
+spectra. From there we can run iSpec to get RVs as normal.
+
+# HOW DO THE ROWS IN THE DB TABLE CHANGE?
+
 # WE NEED TO FIX BLENDS HERE! SET THEIR SWASPIDS RIGHT AWAY TO NOT LEAVE THEM BEHIND!
 
 Estimating Spectral Type
