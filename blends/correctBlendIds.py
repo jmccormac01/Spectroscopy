@@ -1,6 +1,11 @@
 """
 New script to disentangle the blends
 
+When splitting the spectra they must be done object by object
+by modifying the test_length in parseBlendMap
+
+IRAF doesn't like to change directory when then try splitting. grr!
+
 To do:
     Add code to split the traces up and log to the db
 """
@@ -54,6 +59,9 @@ def argParse():
     p.add_argument('--split_apply',
                    help='apply the splits',
                    action='store_true')
+    p.add_argument('--split_length',
+                   help='number of spectra to split',
+                   type=int)
     p.add_argument('--swasp_id',
                    help='swasp_id of single object to check')
     p.add_argument('--ds9',
@@ -74,9 +82,11 @@ def cd(path):
     """
     old_dir = os.getcwd()
     os.chdir(path)
+    print('cd {}'.format(path))
     try:
         yield
     finally:
+        print('cd {}'.format(old_dir))
         os.chdir(old_dir)
 
 def getPartialBlendMap():
@@ -236,7 +246,7 @@ def plotFindingChart(ax, object_id, angle):
     ax.set_title('SKY_PA = {}'.format(angle))
     return ax
 
-def parseBlendMapFile(blend_map):
+def parseBlendMapFile(blend_map, split_length):
     """
     This file maps the original swasp_id and image_id to the the new
     swasp_ids for each trace. This file is made manually in the filter_blends
@@ -248,8 +258,11 @@ def parseBlendMapFile(blend_map):
     image_list = defaultdict(list)
     trace_map = {}
     f = open(blend_map).readlines()
+    split = 0
     for line in f:
         if not line.startswith('#'):
+            if split >= split_length:
+                break
             swasp_id, image_id, t1, t2, t3 = line.split()
             if t1 == 'None':
                 t1 = None
@@ -261,6 +274,7 @@ def parseBlendMapFile(blend_map):
             trace_map[image_id] = {1: t1,
                                    2: t2,
                                    3: t3}
+            split += 1
     return image_list, trace_map
 
 def scopy(iraf, image_id, trace_id, new_image_prefix):
@@ -408,6 +422,9 @@ if __name__ == "__main__":
 
     # work on splitting the blends filtered in the block above
     if args.split_blends:
+        if not args.split_length:
+            print('Must specify --split_length when splitting')
+            sys.exit(1)
         # load IRAF
         here = os.getcwd()
         os.chdir(loginCl_location)
@@ -417,7 +434,7 @@ if __name__ == "__main__":
         os.chdir(here)
         time.sleep(2)
         # read in the map file
-        image_list, trace_map = parseBlendMapFile(map_file)
+        image_list, trace_map = parseBlendMapFile(map_file, args.split_length)
         # loop over each object and each image
         os.chdir(all_spec_dir)
         for swasp_id in image_list:
@@ -488,7 +505,6 @@ if __name__ == "__main__":
                                 addNewUnblendedTableRow(split_spectrum,
                                                         new_swasp_id,
                                                         old_row_info)
-
                     # move the original file into a common blended folder
                     # but only after all traces have been extracted
                     os.system('mv {} {}'.format(image_id, all_blends_dir))

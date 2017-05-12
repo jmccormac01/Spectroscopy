@@ -104,7 +104,9 @@ set to the correct PA to identify the traces. This is a manual step. You must:
       using the ```ingestBlendCompanions.py``` script.
 
 This file is then used to split up the mulitspec files into per object single 1D 
-spectra. From there we can run iSpec to get RVs as normal.
+spectra. From there we can run iSpec to get RVs as normal. 
+
+# FINISH NOTES ON SPLITTING SPECTRA AND LOGGING!
 
 ```undoBlendCollection.py``` splits the multispec files from all_blended back
 into their per object folders
