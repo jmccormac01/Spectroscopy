@@ -77,20 +77,37 @@ Dealing with blends
 -------------------
 
 Blends are spectra that contain two or more traces. The traces have to be
-asigned to the correct swasp_id. To do this we use the ```blends/correctBlands2.py``` 
+asigned to the correct swasp_id. To do this we use the ```blends/correctBlands.py``` 
 script. This plots each spectrum for a given object along with a finding chart
 set to the correct PA to identify the traces. This is a manual step. You must:
-   1. Run ```blends/correctBlends2.py```
+   1. Run ```blends/correctBlends.py```
    1. Make a file containing the following on each line, in order:
       a. swasp_id (this is the main target ID from the header)
       a. image_id
       a. t1_swasp_id
       a. t2_swasp_id
       a. t3_swasp_id
-   1. Add any new blended objects to the ```eblm\_parameters``` mysql table
+   1. Add any new blended objects to a text file containing:
+      a. swasp_id
+      a. pm_ra_mas_y
+      a. pm_dec_mas_y
+      a. period
+      a. epoch
+      a. V mag
+      a. spectral_type
+      a. status
+      a. phase_coverage (boolean, 0 | 1)
+      a. q1 (boolean, 0 | 1)
+      a. q2 (boolean, 0 | 1)
+      a. n_nites 
+   1. Then ingest those new objects into the ```eblm\_parameters``` mysql table
+      using the ```ingestBlendCompanions.py``` script.
 
 This file is then used to split up the mulitspec files into per object single 1D 
 spectra. From there we can run iSpec to get RVs as normal.
+
+```undoBlendCollection.py``` splits the multispec files from all_blended back
+into their per object folders
 
 # HOW DO THE ROWS IN THE DB TABLE CHANGE?
 
