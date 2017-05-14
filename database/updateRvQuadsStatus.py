@@ -24,7 +24,7 @@ def checkQuads(swasp_id, E, P):
     qry2 = """
         SELECT
         image_id, hjd_mid
-        FROM eblm_ids_final
+        FROM eblm_ids_newest
         WHERE swasp_id='{}'
         AND analyse = 1
         """.format(swasp_id)

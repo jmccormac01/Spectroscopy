@@ -224,7 +224,7 @@ def getObjectsForPhaseCoverage(giants):
             exptime = getIdsExptime(mag)
             qry2 = """
                 SELECT count(*)
-                FROM eblm_ids_final
+                FROM eblm_ids_newest
                 WHERE swasp_id='{}'
                 """.format(swasp_id)
             with db.cursor() as cur2:
