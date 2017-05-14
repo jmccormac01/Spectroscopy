@@ -80,14 +80,14 @@ Blends are spectra that contain two or more traces. The traces have to be
 asigned to the correct swasp_id. To do this we use the ```blends/correctBlands.py``` 
 script. This plots each spectrum for a given object along with a finding chart
 set to the correct PA to identify the traces. This is a manual step. You must:
-   1. Run ```blends/correctBlends.py```
-   1. Make a file containing the following on each line, in order:
+   1. Run ```blends/correctBlends.py --filter\_blends --ds9```
+   1. Make file1 containing the following on each line, in order:
       a. swasp_id (this is the main target ID from the header)
       a. image_id
       a. t1_swasp_id
       a. t2_swasp_id
       a. t3_swasp_id
-   1. Add any new blended objects to a text file containing:
+   1. Add any new blended objects to file2 containing:
       a. swasp_id
       a. pm_ra_mas_y
       a. pm_dec_mas_y
@@ -99,21 +99,42 @@ set to the correct PA to identify the traces. This is a manual step. You must:
       a. phase_coverage (boolean, 0 | 1)
       a. q1 (boolean, 0 | 1)
       a. q2 (boolean, 0 | 1)
-      a. n_nites 
-   1. Then ingest those new objects into the ```eblm\_parameters``` mysql table
-      using the ```ingestBlendCompanions.py``` script.
+      a. n_nites
+      a. Then ingest those new objects into the ```eblm\_parameters``` mysql table
+         using the ```ingestBlendCompanions.py``` script.
 
-This file is then used to split up the mulitspec files into per object single 1D 
+File1 is then used to split up the mulitspec files into per object single 1D 
 spectra. From there we can run iSpec to get RVs as normal. 
 
-# FINISH NOTES ON SPLITTING SPECTRA AND LOGGING!
+After a map file has been created (file1 above) we must cycle through it object
+by object, splitting the spectra in steps. This is because PyRAF does not like
+to change directorys for some reason. So, if the current object to split has 5
+spectra, run:
+
+```
+$> python correctBlendIds.py --split\_blends --split\_apply --split\_length 5
+```
+
+Without ```--split\_apply``` the split will only be simulated. Where
+```--filter\_blends``` was used above to display the objects and aid in
+disentangling the blends, ```--split\_blends``` is used to then apply
+disentanglement from the blend map. ```--split\_length``` is required or nothing
+happens.
+
+Afetr splitting, the original spectra with more than 1 trace have
+```analyse=-1``` so we know not to look at them directly. They are also removed
+from each per-object folder, leaving only the extracted 1D spectra there. A new
+row is added to the database table for each 1D spectrum that is split out. They
+have some information from the original table row, and more information specific
+to that object (e.g. the right swasp_id).
 
 ```undoBlendCollection.py``` splits the multispec files from all_blended back
-into their per object folders
+into their per object folders. The rows containing split files must also be
+removed manually from the database to undo everything. 
 
-# HOW DO THE ROWS IN THE DB TABLE CHANGE?
-
-# WE NEED TO FIX BLENDS HERE! SET THEIR SWASPIDS RIGHT AWAY TO NOT LEAVE THEM BEHIND!
+The ```database/checkAllSpectra.py``` script will compare what is in the ```all_spectra```
+folder and what is in the database and report any differences. It is good to
+sanity check there are no complaints before starting the RVs.
 
 Estimating Spectral Type
 ------------------------

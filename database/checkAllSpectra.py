@@ -14,6 +14,7 @@ if __name__ == "__main__":
     qry = """
         SELECT image_id, swasp_id, object_name
         FROM eblm_ids_newest
+        WHERE n_traces = 1
         """
     with pymysql.connect(host='localhost', db='eblm',
                          password='mysqlpassword') as cur:
