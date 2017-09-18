@@ -10,10 +10,6 @@ Steps:
     1. Measure RVs with atomic line mask
     1. Sum these 4 velocities to get the final
        radial velocity
-
-TODO:
-    Finalise the system for analysing the blends
-
 """
 import os
 import sys
@@ -118,6 +114,7 @@ def getSwaspIds():
         FROM eblm_ids_newest
         WHERE barycentric_velocity_iSpec IS NULL
         AND swasp_id IS NOT NULL
+        AND analyse = 1
         ORDER BY swasp_id
         """
     with db.cursor() as cur:
@@ -125,36 +122,6 @@ def getSwaspIds():
         for row in cur:
             swasp_ids.append(row[0])
     return swasp_ids
-
-def isThisABlend(swasp_id, epoch, period):
-    """
-    Check to see if an object has multiple
-    spectra, they need done separately
-
-    Give a summary of the blends so we know to
-    continue observing or not
-    """
-    n_traces, phase, image_ids, utmiddle = [], [], [], []
-    qry = """
-        SELECT n_traces, bjd_mid, image_id, utmiddle
-        FROM eblm_ids_newest
-        WHERE swasp_id ='{}'
-        """.format(swasp_id)
-    with db.cursor() as cur:
-        qry_len = cur.execute(qry)
-        for row in cur:
-            n_traces.append(int(row[0]))
-            phase.append(((float(row[1])-epoch)/period)%1)
-            image_ids.append(row[2])
-            utmiddle.append(row[3])
-    if n_traces.count(1) != qry_len:
-        print('\n{} has multiple spectra, skipping...\n'.format(swasp_id))
-        for i, j, k, l in zip(image_ids, utmiddle, phase, n_traces):
-            print(i, j, k, l)
-        return True
-    else:
-        print('\n{} has single spectra, analysing...'.format(swasp_id))
-        return False
 
 def getDateObs(spec):
     """
@@ -392,11 +359,14 @@ def getTargetParams(swasp_id):
         """.format(swasp_id)
     with db.cursor() as cur:
         cur.execute(qry)
-        for row in cur:
-            epoch = float(row[0]) + 2450000
-            period = float(row[1])
-            spectral_type = row[2]
-    return epoch, period, spectral_type
+        result = cur.fetchone()
+        if result is not None:
+            epoch = float(result[0]) + 2450000
+            period = float(result[1])
+            spectral_type = result[2]
+            return epoch, period, spectral_type
+        else:
+            return None, None, None
 
 def logRVsToDb(spectrum,
                mask,
@@ -476,6 +446,9 @@ if __name__ == '__main__':
                          db='eblm',
                          user='jmcc',
                          password='mysqlpassword')
+    # set up wavelength range for this instrument
+    wave_base = INSTRUMENT[args.instrument]['WV_LLIM']
+    wave_top = INSTRUMENT[args.instrument]['WV_ULIM']
     # get a list of spectral types and the atomic mask
     # line list indexes. this is used to ID the best mask
     spec_types_list, atomicMaskLinesIndexes = getAtomicLineMaskIndexes(atomicMaskLines)
@@ -493,19 +466,9 @@ if __name__ == '__main__':
         if not swasp_id.startswith('HD'):
             epoch, period, spectral_type = getTargetParams(swasp_id)
             print('{} E={} P={} ST={}'.format(swasp_id, epoch, period, spectral_type))
-        # treat blends properly later!
-        blend = isThisABlend(swasp_id, epoch, period)
-        if blend:
-            # update the status?
-            current_status = getCurrentStatus(swasp_id)
-            print('Current status: {}'.format(current_status))
-            if not args.no_comment:
-                update_status = raw_input('Update Status? (y/n): ')
-                if update_status == 'y':
-                    new_status = raw_input('New Status: ')
-                    updateTargetStatus(swasp_id, new_status)
-            continue
-
+            if epoch is None or period is None or spectral_type is None:
+                print('Skipping {}...'.format(swasp_id))
+                continue
         target_dir = '{}/{}'.format(iSpec_dir, swasp_id)
         os.chdir(target_dir)
         # get list of spectra
@@ -543,16 +506,18 @@ if __name__ == '__main__':
 
             # set up the plots
             if args.plot:
-                #fig, ax = plt.subplots(3, 1, figsize=(10, 10))
-                #ax[0].set_title('Spectral Analysis - {}'.format(swasp_id))
                 plt.ion()
-                ax_spec = plt.subplot2grid((6, 4), (0, 0), colspan=4, rowspan=2)
+                fig = plt.figure(1, figsize=(10, 10))
+                ax_spec = plt.subplot2grid((4, 4), (0, 0), colspan=4, rowspan=2)
                 ax_spec.set_title('{} {}'.format(swasp_id, spectrum))
-                ax_mask_rv = plt.subplot2grid((6, 4), (2, 0), colspan=2, rowspan=2)
-                ax_mask_rv.set_title('RV wrt {}'.format(mask_type))
-                ax_mask_ccf = plt.subplot2grid((6, 4), (4, 0), colspan=2, rowspan=2)
+                ax_mask_rv = plt.subplot2grid((4, 4), (2, 0), colspan=2, rowspan=2)
+                ax_mask_rv.set_title('RV wrt {} (w/ bary_corr)'.format(mask_type))
+                ax_mask_ccf = plt.subplot2grid((4, 4), (2, 2), colspan=2, rowspan=2)
                 ax_mask_ccf.set_title('CCF wrt {}'.format(mask_type))
                 plt.subplots_adjust(hspace=1.0)
+                # figure for each ccf
+                fig_ccf, ax_ccf = plt.subplots(1, figsize=(10, 10))
+                ax_ccf.set_title('CCF wrt {}'.format(mask_type))
                 plt.show()
 
             # read in the spectrum
@@ -563,12 +528,12 @@ if __name__ == '__main__':
             # accesss the data using column names
             # e.g. s['waveobs' | 'flux' | 'err']
             wave_filter = ispec.create_wavelength_filter(spec, \
-                                          wave_base=INSTRUMENT[args.instrument]['WV_LLIM'], \
-                                          wave_top=INSTRUMENT[args.instrument]['WV_ULIM'])
+                                                         wave_base=wave_base, \
+                                                         wave_top=wave_top)
             spec = spec[wave_filter]
             print('{} Wavelength range restricted to {}-{}'.format(spectrum, \
-                                            INSTRUMENT[args.instrument]['WV_LLIM'], \
-                                            INSTRUMENT[args.instrument]['WV_ULIM']))
+                                                                   wave_base, \
+                                                                   wave_top))
             if args.plot:
                 ax_spec.plot(spec['waveobs'], spec['flux'], 'r-')
 
@@ -606,9 +571,11 @@ if __name__ == '__main__':
                 if args.plot:
                     ax_mask_ccf.plot(mask_ccf['x'], mask_ccf['y'], 'r-')
                     ax_mask_ccf.set_xlabel('Velocity (km/s)')
+                    ax_ccf.plot(mask_ccf['x'], mask_ccf['y'], 'r-')
+                    ax_ccf.set_xlabel('Velocity (km/s)')
             mask_rvs.append(mask_rv)
             mask_rvs_errs.append(mask_rv_err)
-
+            abs_rvs.append(mask_rv + barycentric_velocity)
             # make a dictionary of the results
             results[bjd.jd] = (dateobs, \
                                barycentric_velocity, \
@@ -625,7 +592,7 @@ if __name__ == '__main__':
                 if args.plot:
                     # make some plots of the steps
                     ax_mask_rv.set_xlim(0, 1)
-                    ax_mask_rv.errorbar(phase, mask_rvs, yerr=mask_rvs_errs, fmt='r.')
+                    ax_mask_rv.errorbar(phase, abs_rvs, yerr=mask_rvs_errs, fmt='r.')
                     ax_mask_rv.set_xlabel('Orbital Phase')
                     plt.show()
 
@@ -650,18 +617,20 @@ if __name__ == '__main__':
                 comments.append('nc')
 
             # log all the info plus comment to the database
-            print('WARNING, NOT LOGGING RVS TO DB!')
-            #logRVsToDb(spectrum,
-            #           mask_type,
-            #           mask_ccf_height,
-            #           mask_ccf_fwhm,
-            #           mask_rv,
-            #           mask_rv_err,
-            #           v_tell,
-            #           v_tell_err,
-            #           barycentric_velocity,
-            #           comment)
-
+            logRVsToDb(spectrum,
+                       mask_type,
+                       mask_ccf_height,
+                       mask_ccf_fwhm,
+                       mask_rv,
+                       mask_rv_err,
+                       v_tell,
+                       v_tell_err,
+                       barycentric_velocity,
+                       comment)
+            # save the ccf figure
+            fig_ccf.savefig('{}_ccf_{}.png'.format(spectrum.split('.fits')[0],
+                                                   mask_type), dpi=400)
+            plt.close(fig_ccf)
         # don't do this for standard stars
         if not swasp_id.startswith('HD'):
             # print results and update the target in the database
@@ -671,7 +640,7 @@ if __name__ == '__main__':
                                                                  mask_type))
             print("Epoch: {} Period: {}".format(round(epoch, 6), round(period, 6)))
             print("Current Status: {}".format(current_status))
-            print("BJD             PHASE   BCV    V_TELL   RV  CCF  FWHM  COMMENTS")
+            print("BJD             PHASE   BCV    V_TELL   MASK  CCF  FWHM  RV   COMMENTS")
             for i, j, k, l, m, n, o, p in zip(bjds,
                                               phase,
                                               barycentric_velocities,
@@ -682,7 +651,7 @@ if __name__ == '__main__':
                                               comments):
                 print(round(i, 5), round(j, 4), round(k, 4),
                       round(l, 4), round(m, 4), round(n, 4),
-                      round(o, 4), p)
+                      round(o, 4), round(m + k, 4), p)
             if not args.no_comment:
                 update_status = raw_input('Update Status? (y/n): ')
                 if update_status == 'y':
@@ -691,7 +660,7 @@ if __name__ == '__main__':
         # do this instead
         else:
             print('\nID: {}'.format(swasp_id))
-            print("BJD  BCV  V_TELL  RV  CCF  FWHM   COMMENTS")
+            print("BJD  BCV  V_TELL  MASK  CCF  FWHM  RV   COMMENTS")
             for i, j, k, l, m, n, o in zip(bjds,
                                            barycentric_velocities,
                                            v_tells,
@@ -701,5 +670,5 @@ if __name__ == '__main__':
                                            comments):
                 print(round(i, 5), round(j, 4), round(k, 4),
                       round(l, 4), round(m, 4), round(n, 4),
-                      o)
+                      round(j + l, 4), o)
         plt.cla()
