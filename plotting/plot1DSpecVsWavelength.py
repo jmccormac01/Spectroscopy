@@ -1,4 +1,6 @@
 from astropy.io import fits
+import matplotlib
+matplotlib.use('QT5Agg')
 import matplotlib.pyplot as plt
 import glob as g
 import numpy as np

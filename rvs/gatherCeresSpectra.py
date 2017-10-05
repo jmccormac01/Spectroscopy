@@ -23,8 +23,12 @@ def argParse():
 
 if __name__ == "__main__":
     args = argParse()
-    all_spec_dir = '/Users/jmcc/Dropbox/data/{}/all_spectra'.format(args.instrument)
-    dir_list = g.glob('*{}*_red_*'.format(args.instrument))
+    top_dir = '/Users/jmcc/Dropbox/data/{}'.format(args.instrument)
+    all_spec_dir = '{}/all_spectra'.format(top_dir)
+
+    # get a list of reduced nights
+    os.chdir(top_dir)
+    dir_list = g.glob('*_red*')
 
     for directory in dir_list:
         os.chdir('{}/proc'.format(directory))

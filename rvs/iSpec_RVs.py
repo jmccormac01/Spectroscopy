@@ -217,6 +217,9 @@ def getCcfMaskType(swasp_id, spec_types, maskIndexes):
         cur.execute(qry)
         for row in cur:
             spec_type = row[0]
+    # trim any .5V spectral classes to the base class
+    if '.' in spec_type:
+        spec_type = spec_type.split('.')[0]
     index = spec_types.index(spec_type)
     diff = 1E6
     for mask in maskIndexes:

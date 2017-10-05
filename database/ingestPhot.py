@@ -98,7 +98,7 @@ if __name__ == "__main__":
                 print("{} {} PHOT ALREADY EXISTS, CHECK! Skipping...".format(swasp_id, args.instrument))
     else:
         # check for phot already ingested
-        res = checkForPhot(swasp_id, args.instrument)
+        res = checkForPhot(args.swasp_id, args.instrument)
         if not res:
             t, m, e = np.loadtxt(args.infile, usecols=[0, 1, 2], unpack=True)
             ingest(t, m, e, args.swasp_id, args.instrument, args.filter)
