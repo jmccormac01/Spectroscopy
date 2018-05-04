@@ -43,7 +43,7 @@ atomicMaskLines = {'A0': line_lists_parent + 'HARPS_SOPHIE.A0.350_1095nm/mask.ls
                    'M5': line_lists_parent + 'HARPS_SOPHIE.M5.400_687nm/mask.lst'}
 
 # set up observatory
-olat = 28.+(45./60.)-(37./3600.)
+olat = 28.+(45./60.)+(37./3600.)
 olon = -17.-(52./60.)-(46./3600.)
 elev = 2332.
 OBSERVATORY = EarthLocation(lat=olat*u.deg, lon=olon*u.deg, height=elev*u.m)
