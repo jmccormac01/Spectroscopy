@@ -55,11 +55,11 @@ def readInitialAndPriors(infile):
             init_priors['norm_range'] = None
     return init_priors
 
-def lnprior(theta, init_priors, voigt=False):
+def lnprior(theta, init_priors, profile='gaussian'):
     """
     """
     # put very wide liberal uniform priors on all variables
-    if voigt:
+    if profile == 'voigt':
         m1, s1g, s1l, a1, m2, s2g, s2l, a2 = theta
         if init_priors['m1']['prior_l'] < m1 < init_priors['m1']['prior_h'] and \
             init_priors['s1g']['prior_l'] < s1g < init_priors['s1g']['prior_h'] and \
@@ -84,11 +84,11 @@ def lnprior(theta, init_priors, voigt=False):
         else:
             return -np.inf
 
-def lnlike(theta, x, y, yerr, voigt=False):
+def lnlike(theta, x, y, yerr, profile='gaussian'):
     """
     """
     # voigt or gaussian?
-    if voigt:
+    if profile == 'voigt':
         m1, s1g, s1l, a1, m2, s2g, s2l, a2 = theta
         model = doubleVoigt(x, m1, s1g, s1l, a1, m2, s2g, s2l, a2)
     else:
@@ -103,13 +103,13 @@ def lnlike(theta, x, y, yerr, voigt=False):
         lnlike = -0.5*(np.sum(eq_p1) - np.log(len(y) + 1))
     return lnlike
 
-def lnprob(theta, init_priors, x, y, yerr, voigt=False):
+def lnprob(theta, init_priors, x, y, yerr, profile='gaussian'):
     """
     """
-    lp = lnprior(theta, init_priors, voigt=voigt)
+    lp = lnprior(theta, init_priors, profile=profile)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(theta, x, y, yerr, voigt=voigt)
+    return lp + lnlike(theta, x, y, yerr, profile=profile)
 
 def doubleGaussian(x, m1, s1, a1, m2, s2, a2):
     """
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     args = argParse()
     # read in the CCF to fit
     data_dir = "/Users/jmcc/Dropbox/NGTS/FullInstrument/Planets/NGTS-4b/HARPS"
-    data_file_base = "HARPS.2017-12-23T03_53_23.073_s1d_A"
+    data_file_base = "HARPS_Master_10spectra"
     data_file = "{}/{}.ccf".format(data_dir, data_file_base)
     init_priors_file = "{}/{}.sb2".format(data_dir, data_file_base)
     # used for CCF text files
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     if args.plot_ccf_only:
         fig, ax = plt.subplots(1, figsize=(10, 10))
-        ax.plot(x, y, 'k-')
+        ax.plot(x, y, 'k.')
         ax.set_ylabel('Contrast')
         ax.set_xlabel('Radial Velocity (km/s)')
         if not args.norm:
@@ -242,10 +242,11 @@ if __name__ == "__main__":
         ax.axhline(initial_param, color="#888888", lw=2)
         ax.set_ylabel(label)
         ax.set_xlabel('step number')
-        fig.savefig('{}/chain_{}steps_{}walkers_{}.png'.format(data_dir,
-                                                               nsteps,
-                                                               nwalkers,
-                                                               label))
+        fig.savefig('{}/{}_sb2/chain_{}steps_{}walkers_{}.png'.format(data_dir,
+                                                                      data_file_base,
+                                                                      nsteps,
+                                                                      nwalkers,
+                                                                      label))
     burnin = int(raw_input('Enter burnin period: '))
     samples = sampler.chain[:, burnin:, :].reshape((-1, ndim))
 
@@ -290,7 +291,8 @@ if __name__ == "__main__":
                                     "$a2$"],
                             truths=initial,
                             plot_contours=False)
-        fig.savefig('{}/corner_{}steps_{}walkers.png'.format(data_dir, nsteps, nwalkers))
+        fig.savefig('{}/{}_sb2/corner_{}steps_{}walkers.png'.format(data_dir, data_file_base,
+                                                                    nsteps, nwalkers))
     else:
         # extract the results from post-burnin
         m1 = np.median(samples[:, 0])
@@ -324,7 +326,8 @@ if __name__ == "__main__":
                                     "$a2$"],
                             truths=initial,
                             plot_contours=False)
-        fig.savefig('{}/corner_{}steps_{}walkers.png'.format(data_dir, nsteps, nwalkers))
+        fig.savefig('{}/{}_sb2/corner_{}steps_{}walkers.png'.format(data_dir, data_file_base,
+                                                                    nsteps, nwalkers))
 
     # plot the final model and output the results
     fig2, ax2 = plt.subplots(2, figsize=(10, 10))
@@ -344,7 +347,7 @@ if __name__ == "__main__":
         ax2[1].legend(('CCF', 'SB2tool model'), loc=2)
         ax2[0].set_ylabel('CCF')
         ax2[1].set_xlabel('Radial velocity (km/s)')
-        fig2.savefig('{}/fitted_double_voigt.png'.format(data_dir))
+        fig2.savefig('{}/{}_sb2/fitted_double_voigt.png'.format(data_dir, data_file_base))
         # save the results to file
         with open('{}/fitted_double_voigt.log'.format(data_dir), 'w') as of:
             of.write('m1 = {} +/- {}\n'.format(m1, em1))
@@ -370,7 +373,7 @@ if __name__ == "__main__":
         ax2[1].legend(('CCF', 'SB2tool model'), loc=2)
         ax2[0].set_ylabel('CCF')
         ax2[1].set_xlabel('Radial velocity (km/s)')
-        fig2.savefig('{}/fitted_double_gaussian.png'.format(data_dir))
+        fig2.savefig('{}/{}_sb2/fitted_double_gaussian.png'.format(data_dir, data_file_base))
         # save the results to file
         with open('{}/fitted_double_gaussian.log'.format(data_dir), 'w') as of:
             of.write('m1 = {} +/- {}\n'.format(m1, em1))
