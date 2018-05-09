@@ -1,6 +1,10 @@
 """
 Script to plot extracted CCFs from iSpec,
 colour coded based on orbital phase
+
+The CCFs from iSpec are not as good as those from
+HARPS DRS, which is done order by order. Use the
+plotHarpsCcfs script instead!!!!
 """
 import glob as g
 import matplotlib

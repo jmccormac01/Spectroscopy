@@ -2,7 +2,10 @@
 Code to fit double gaussians to SB2 CCFs
 
 Need to generalise this code for priors and the inputs
-to allow for fixed and floating parameters
+
+This is a version of fitSb2.py to hack up and try
+fixing the voigt profile widths and fitting some
+NGTS-4 CCFs
 """
 import sys
 import argparse as ap
@@ -45,6 +48,10 @@ def readInitialAndPriors(infile):
         if line.split()[0] == 'norm_range':
             name, lower, upper = line.split()
             init_priors[name] = (float(lower), float(upper))
+        elif line.split()[0].startswith('s1') or line.split()[0].startswith('s2'):
+            name, initial = line.split()
+            init_priors[name] = OrderedDict()
+            init_priors[name]['initial'] = float(initial)
         else:
             name, initial, sigma_walkers, prior_l, prior_h = line.split()
             init_priors[name] = OrderedDict()
@@ -61,39 +68,39 @@ def lnprior(theta, init_priors, profile='gaussian'):
     """
     # put very wide liberal uniform priors on all variables
     if profile == 'voigt':
-        m1, s1g, s1l, a1, m2, s2g, s2l, a2 = theta
+        m1, a1, m2, a2 = theta
         if init_priors['m1']['prior_l'] < m1 < init_priors['m1']['prior_h'] and \
-            init_priors['s1g']['prior_l'] < s1g < init_priors['s1g']['prior_h'] and \
-            init_priors['s1l']['prior_l'] < s1l < init_priors['s1l']['prior_h'] and \
             init_priors['a1']['prior_l'] < a1 < init_priors['a1']['prior_h'] and \
             init_priors['m2']['prior_l'] < m2 < init_priors['m2']['prior_h'] and \
-            init_priors['s2g']['prior_l'] < s2g < init_priors['s2g']['prior_h'] and \
-            init_priors['s2l']['prior_l'] < s2l < init_priors['s2l']['prior_h'] and \
             init_priors['a2']['prior_l'] < a2 < init_priors['a2']['prior_h']:
             return 0.0
         else:
             return -np.inf
     else:
-        m1, s1, a1, m2, s2, a2 = theta
+        m1, a1, m2, a2 = theta
         if init_priors['m1']['prior_l'] < m1 < init_priors['m1']['prior_h'] and \
-            init_priors['s1']['prior_l'] < s1 < init_priors['s1']['prior_h'] and \
             init_priors['a1']['prior_l'] < a1 < init_priors['a1']['prior_h'] and \
             init_priors['m2']['prior_l'] < m2 < init_priors['m2']['prior_h'] and \
-            init_priors['s2']['prior_l'] < s2 < init_priors['s2']['prior_h'] and \
             init_priors['a2']['prior_l'] < a2 < init_priors['a2']['prior_h']:
             return 0.0
         else:
             return -np.inf
 
-def lnlike(theta, x, y, yerr, profile='gaussian'):
+def lnlike(theta, x, y, yerr, init_priors, profile='gaussian'):
     """
     """
     # voigt or gaussian?
     if profile == 'voigt':
-        m1, s1g, s1l, a1, m2, s2g, s2l, a2 = theta
+        m1, a1, m2, a2 = theta
+        s1g = init_priors['s1g']['initial']
+        s1l = init_priors['s1l']['initial']
+        s2g = init_priors['s2g']['initial']
+        s2l = init_priors['s2l']['initial']
         model = doubleVoigt(x, m1, s1g, s1l, a1, m2, s2g, s2l, a2)
     else:
-        m1, s1, a1, m2, s2, a2 = theta
+        m1, a1, m2, a2 = theta
+        s1 = init_priors['s1']['initial']
+        s2 = init_priors['s2']['initial']
         model = doubleGaussian(x, m1, s1, a1, m2, s2, a2)
 
     if True in np.isnan(model) or np.min(model) <= 0:
@@ -110,7 +117,7 @@ def lnprob(theta, init_priors, x, y, yerr, profile='gaussian'):
     lp = lnprior(theta, init_priors, profile=profile)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(theta, x, y, yerr, profile=profile)
+    return lp + lnlike(theta, x, y, yerr, init_priors, profile=profile)
 
 def doubleGaussian(x, m1, s1, a1, m2, s2, a2):
     """
@@ -142,7 +149,7 @@ if __name__ == "__main__":
     args = argParse()
     # read in the CCF to fit
     data_dir = "/Users/jmcc/Dropbox/NGTS/FullInstrument/Planets/NGTS-4b/HARPS"
-    data_file_base = "HARPS_Master_10spectra"
+    data_file_base = "HARPS.2017-12-23T03_53_23.073_ccf_K5_A"
     data_file = "{}/{}.ccf".format(data_dir, data_file_base)
     init_priors_file = "{}/{}.sb2".format(data_dir, data_file_base)
     # used for CCF text files
@@ -186,38 +193,26 @@ if __name__ == "__main__":
         FIT_TYPE = 'voigt'
         # set up the MCMC arrays
         initial = [init_priors['m1']['initial'],
-                   init_priors['s1g']['initial'],
-                   init_priors['s1l']['initial'],
                    init_priors['a1']['initial'],
                    init_priors['m2']['initial'],
-                   init_priors['s2g']['initial'],
-                   init_priors['s2l']['initial'],
                    init_priors['a2']['initial']]
-        parameters = [key for key in init_priors if key != 'norm_range']
+        parameters = [key for key in init_priors if key != 'norm_range' and not key.startswith('s')]
         weights = [init_priors['m1']['sigma_walkers'],
-                   init_priors['s1g']['sigma_walkers'],
-                   init_priors['s1l']['sigma_walkers'],
                    init_priors['a1']['sigma_walkers'],
                    init_priors['m2']['sigma_walkers'],
-                   init_priors['s2g']['sigma_walkers'],
-                   init_priors['s2l']['sigma_walkers'],
                    init_priors['a2']['sigma_walkers']]
     else:
         print('Using Gaussian profile')
         FIT_TYPE = 'gaussian'
         # set up the MCMC arrays
         initial = [init_priors['m1']['initial'],
-                   init_priors['s1']['initial'],
                    init_priors['a1']['initial'],
                    init_priors['m2']['initial'],
-                   init_priors['s2']['initial'],
                    init_priors['a2']['initial']]
         parameters = [key for key in init_priors if key != 'norm_range']
         weights = [init_priors['m1']['sigma_walkers'],
-                   init_priors['s1']['sigma_walkers'],
                    init_priors['a1']['sigma_walkers'],
                    init_priors['m2']['sigma_walkers'],
-                   init_priors['s2']['sigma_walkers'],
                    init_priors['a2']['sigma_walkers']]
     # set up sampler
     ndim = len(initial)
@@ -243,143 +238,109 @@ if __name__ == "__main__":
         ax.axhline(initial_param, color="#888888", lw=2)
         ax.set_ylabel(label)
         ax.set_xlabel('step number')
-        fig.savefig('{}/{}_sb2/chain_{}steps_{}walkers_{}.png'.format(data_dir,
-                                                                      data_file_base,
-                                                                      nsteps,
-                                                                      nwalkers,
-                                                                      label))
+        fig.savefig('{}/{}_sb2/chain_{}steps_{}walkers_{}_fw.png'.format(data_dir,
+                                                                         data_file_base,
+                                                                         nsteps,
+                                                                         nwalkers,
+                                                                         label))
     burnin = int(raw_input('Enter burnin period: '))
     samples = sampler.chain[:, burnin:, :].reshape((-1, ndim))
 
     if FIT_TYPE == 'voigt':
         # extract the results from post-burnin
         m1 = np.median(samples[:, 0])
-        s1g = np.median(samples[:, 1])
-        s1l = np.median(samples[:, 2])
-        a1 = np.median(samples[:, 3])
-        m2 = np.median(samples[:, 4])
-        s2g = np.median(samples[:, 5])
-        s2l = np.median(samples[:, 6])
-        a2 = np.median(samples[:, 7])
+        a1 = np.median(samples[:, 1])
+        m2 = np.median(samples[:, 2])
+        a2 = np.median(samples[:, 3])
         em1 = np.std(samples[:, 0])
-        es1g = np.std(samples[:, 1])
-        es1l = np.std(samples[:, 2])
-        ea1 = np.std(samples[:, 3])
-        em2 = np.std(samples[:, 4])
-        es2g = np.std(samples[:, 5])
-        es2l = np.std(samples[:, 6])
-        ea2 = np.std(samples[:, 7])
+        ea1 = np.std(samples[:, 1])
+        em2 = np.std(samples[:, 2])
+        ea2 = np.std(samples[:, 3])
 
         # print the results
         print('m1 = {} +/- {}'.format(m1, em1))
-        print('s1g = {} +/- {}'.format(s1g, es1g))
-        print('s1l = {} +/- {}'.format(s1l, es1l))
         print('a1 = {} +/- {}'.format(a1, ea1))
         print('m2 = {} +/- {}'.format(m2, em2))
-        print('s2g = {} +/- {}'.format(s2g, es2g))
-        print('s2l = {} +/- {}'.format(s2l, es2l))
         print('a2 = {} +/- {}'.format(a2, ea2))
 
         # make a corner plot
         fig = corner.corner(samples,
                             labels=["$m1$",
-                                    "$s1g$",
-                                    "$s1l$",
                                     "$a1$",
                                     "$m2$",
-                                    "$s2g$",
-                                    "$s2l$",
                                     "$a2$"],
                             truths=initial,
                             plot_contours=False)
-        fig.savefig('{}/{}_sb2/corner_{}steps_{}walkers.png'.format(data_dir, data_file_base,
-                                                                    nsteps, nwalkers))
+        fig.savefig('{}/{}_sb2/corner_{}steps_{}walkers_fw.png'.format(data_dir, data_file_base,
+                                                                       nsteps, nwalkers))
     else:
         # extract the results from post-burnin
         m1 = np.median(samples[:, 0])
-        s1 = np.median(samples[:, 1])
         a1 = np.median(samples[:, 2])
         m2 = np.median(samples[:, 3])
-        s2 = np.median(samples[:, 4])
         a2 = np.median(samples[:, 5])
         em1 = np.std(samples[:, 0])
-        es1 = np.std(samples[:, 1])
         ea1 = np.std(samples[:, 2])
         em2 = np.std(samples[:, 3])
-        es2 = np.std(samples[:, 4])
         ea2 = np.std(samples[:, 5])
 
         # print the results
         print('m1 = {} +/- {}'.format(m1, em1))
-        print('s1 = {} +/- {}'.format(s1, es1))
         print('a1 = {} +/- {}'.format(a1, ea1))
         print('m2 = {} +/- {}'.format(m2, em2))
-        print('s2 = {} +/- {}'.format(s2, es2))
         print('a2 = {} +/- {}'.format(a2, ea2))
 
         # make a corner plot
         fig = corner.corner(samples,
                             labels=["$m1$",
-                                    "$s1$",
                                     "$a1$",
                                     "$m2$",
-                                    "$s2$",
                                     "$a2$"],
                             truths=initial,
                             plot_contours=False)
-        fig.savefig('{}/{}_sb2/corner_{}steps_{}walkers.png'.format(data_dir, data_file_base,
-                                                                    nsteps, nwalkers))
+        fig.savefig('{}/{}_sb2/corner_{}steps_{}walkers_fw.png'.format(data_dir, data_file_base,
+                                                                       nsteps, nwalkers))
 
     # plot the final model and output the results
     fig2, ax2 = plt.subplots(2, figsize=(10, 10))
     # final model
     if FIT_TYPE == 'voigt':
-        final_model = doubleVoigt(x, m1, s1g, s1l, a1, m2, s2g, s2l, a2)
+        final_model = doubleVoigt(x, m1,
+                                  init_priors['s1g']['initial'],
+                                  init_priors['s1l']['initial'],
+                                  a1, m2,
+                                  init_priors['s2g']['initial'],
+                                  init_priors['s2l']['initial'],
+                                  a2)
         # plot the final model
         ax2[0].plot(x, y, 'k-')
         ax2[0].plot(x, final_model, 'r-')
         ax2[0].legend(('CCF', 'SB2tool model'), loc=2)
         ax2[0].set_ylabel('CCF')
         ax2[0].set_xlabel('Radial velocity (km/s)')
-        ax2[1].plot(x, y, 'k-')
-        ax2[1].plot(x, final_model, 'r-')
-        ax2[1].set_xlim(m1-2*s1g, m1+2*s1g)
-        ax2[1].set_ylim(1-a1-0.05, 1-a1+0.15)
-        ax2[1].legend(('CCF', 'SB2tool model'), loc=2)
-        ax2[0].set_ylabel('CCF')
-        ax2[1].set_xlabel('Radial velocity (km/s)')
-        fig2.savefig('{}/{}_sb2/fitted_double_voigt.png'.format(data_dir, data_file_base))
+        fig2.savefig('{}/{}_sb2/fitted_double_voigt_fw.png'.format(data_dir, data_file_base))
         # save the results to file
-        with open('{}/{}_sb2/fitted_double_voigt.log'.format(data_dir, data_file_base), 'w') as of:
+        with open('{}/{}_sb2/fitted_double_voigt_fw.log'.format(data_dir, data_file_base), 'w') as of:
             of.write('m1 = {} +/- {}\n'.format(m1, em1))
-            of.write('s1g = {} +/- {}\n'.format(s1g, es1g))
-            of.write('s1l = {} +/- {}\n'.format(s1l, es1l))
             of.write('a1 = {} +/- {}\n'.format(a1, ea1))
             of.write('m2 = {} +/- {}\n'.format(m2, em2))
-            of.write('s2g = {} +/- {}\n'.format(s2g, es2g))
-            of.write('s2l = {} +/- {}\n'.format(s2l, es2l))
             of.write('a2 = {} +/- {}\n'.format(a2, ea2))
     else:
-        final_model = doubleGaussian(x, m1, s1, a1, m2, s2, a2)
+        final_model = doubleGaussian(x, m1,
+                                     init_priors['s1']['initial'],
+                                     a1, m2,
+                                     init_priors['s2']['initial'],
+                                     a2)
         # plot the final model
         ax2[0].plot(x, y, 'k-')
         ax2[0].plot(x, final_model, 'r-')
         ax2[0].legend(('CCF', 'SB2tool model'), loc=2)
         ax2[0].set_ylabel('CCF')
         ax2[0].set_xlabel('Radial velocity (km/s)')
-        ax2[1].plot(x, y, 'k-')
-        ax2[1].plot(x, final_model, 'r-')
-        ax2[1].set_xlim(m1-2*s1, m1+2*s1)
-        ax2[1].set_ylim(1-a1-0.05, 1-a1+0.15)
-        ax2[1].legend(('CCF', 'SB2tool model'), loc=2)
-        ax2[0].set_ylabel('CCF')
-        ax2[1].set_xlabel('Radial velocity (km/s)')
-        fig2.savefig('{}/{}_sb2/fitted_double_gaussian.png'.format(data_dir, data_file_base))
+        fig2.savefig('{}/{}_sb2/fitted_double_gaussian_fw.png'.format(data_dir, data_file_base))
         # save the results to file
-        with open('{}/{}_sb2/fitted_double_gaussian.log'.format(data_dir, data_file_base), 'w') as of:
+        with open('{}/{}_sb2/fitted_double_gaussian_fw.log'.format(data_dir, data_file_base), 'w') as of:
             of.write('m1 = {} +/- {}\n'.format(m1, em1))
-            of.write('s1 = {} +/- {}\n'.format(s1, es1))
             of.write('a1 = {} +/- {}\n'.format(a1, ea1))
             of.write('m2 = {} +/- {}\n'.format(m2, em2))
-            of.write('s2 = {} +/- {}\n'.format(s2, es2))
             of.write('a2 = {} +/- {}\n'.format(a2, ea2))

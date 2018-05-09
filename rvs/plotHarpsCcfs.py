@@ -1,5 +1,8 @@
 """
-Script to plot the CCFs from HARPS DRS
+Script to extract and plot the CCFs from HARPS DRS
+
+This script also makes a master CCF for meaursing the width
+when fitting SB2s etc
 """
 import os
 import glob as g
@@ -49,8 +52,7 @@ if __name__ == "__main__":
         data = np.sum(h[0].data, axis=0)
         data_norm = data / np.average(data[:120])
         # save the ccf to disc if not already there
-        if not os.path.exists(ccf_filename):
-            np.savetxt(ccf_filename, np.c_[x, data_norm], fmt='%.5f  %.5f', header='velocity_kms  contrast')
+        np.savetxt(ccf_filename, np.c_[x, data_norm], fmt='%.5f  %.5f', header='velocity_kms  contrast')
         ax[0].plot(x, data_norm + i*0.15, 'k-', lw=0.2)
         ax[0].text(10, 1+i*0.15, "phase={:.3f}".format(phases[i]), fontsize=6)
 
