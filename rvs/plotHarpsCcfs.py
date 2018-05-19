@@ -66,7 +66,7 @@ if __name__ == "__main__":
     stacked = np.vstack(data_aligned)
     stacked_ccf = np.sum(stacked, axis=0)
     stacked_ccf_norm = stacked_ccf / np.average(stacked_ccf[:120])
-    master_ccf_filename = "{}/HARPS_Master_10spectra.ccf".format(indir)
+    master_ccf_filename = "{}/HARPS_Master_10spectra.mccf".format(indir)
     if not os.path.exists(master_ccf_filename):
         np.savetxt(master_ccf_filename,
                    np.c_[interp_x, stacked_ccf_norm],
