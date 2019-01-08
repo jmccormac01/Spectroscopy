@@ -43,16 +43,40 @@ def bootstrap(x, y):
     return slope_mean, slope_error, intersection_mean, intersection_error
 
 # load a test CCF
-ccf_dir = "/Users/jmcc/Dropbox/NGTS/FullInstrument/Planets/NGTS-4b/HARPS"
+#ccf_dir = "/Users/jmcc/Dropbox/NGTS/FullInstrument/Planets/NGTS-4b/HARPS"
+#ccf_dir = "/Users/jmcc/Dropbox/WASP-115/FromPeople/GH/ccf"
+ccf_dir = "/Users/jmcc/Dropbox/WASP-115/FromPeople/LDN/coralie_ccfs/"
 os.chdir(ccf_dir)
 ccfs = sorted(g.glob('*.ccf'))
 
-base_scale = 0.10
-tip_scale = 0.95
-# from harps reduction with K5 mask
-rvs = np.array([38.71133, 38.48704, 38.54511, 39.62744,
-                38.56517, 39.47586, 39.47193, 38.51532,
-                38.93692, 39.67866])
+base_scale = 0.15
+tip_scale = 0.90
+
+# NGTS-Jb from harps reduction with K5 mask
+#rvs = np.array([38.71133, 38.48704, 38.54511, 39.62744,
+#                38.56517, 39.47586, 39.47193, 38.51532,
+#                38.93692, 39.67866])
+# WASP-115 SOPHIE RVs from fitSb1.py
+#rvs = np.array([-6.90585,-6.57714,-6.83803,-6.75561,
+#                -6.87629,-6.80859,-6.51126,-6.84531,
+#                -6.96599,-6.47758,-6.62626,-7.06729,
+#                -7.12745,-6.87408,-6.73865,-7.11735,
+#                -6.82666,-6.90186,-7.14080,-6.60190,
+#                -6.60495,-6.41223,-6.83701,-6.51078,
+#                -6.82850,-6.31690,-6.69705,-6.53061,
+#                -6.92179,-6.88331,-6.57302,-6.66156,
+#                -6.71455,-6.71996,-6.62174,-7.06026,
+#                -6.85172,-6.71634,-6.47442,-6.33494,
+#                -7.03263,-6.60973,-6.82393,-6.66758,
+#                -6.70246,-6.66266,-6.78572,-6.73903,
+#                -6.68114,-6.77028,-6.78255,-6.74258,
+#                -6.80903,-6.84091,-6.88471,-6.91554,
+#                -6.47714,-6.45855,-6.83316,-6.53799])
+
+rvs = np.array([-6.79317,-6.69441,-6.72513,-6.42953,
+                -6.42502,-6.80096,-6.64555,-6.81586,
+                -6.57182,-6.51126,-6.91659,-6.39501,
+                -6.87293,-6.65121,-6.72640])
 
 # make the cuts to get only the wings between the contrast limits
 bisector_slope = np.empty(len(ccfs))
@@ -67,7 +91,7 @@ for i, ccf in enumerate(ccfs):
     ctip = 1 - tip_scale*cheight
 
     # mask out the CCF within the fitting range
-    n = np.where(((contrast >= ctip) & (contrast <= cbase) & (velocity > 25) & (velocity < 50)))[0]
+    n = np.where(((contrast >= ctip) & (contrast <= cbase) & (velocity > -35) & (velocity < 25)))[0]
     velocity_fit = np.copy(velocity[n])
     contrast_fit = np.copy(contrast[n])
     # now split the velocities/contrasts about the RV point to get the two wings
@@ -144,8 +168,8 @@ for i, ccf in enumerate(ccfs):
 bisector_trend_mean, bisector_trend_error, bisector_intersection, bisector_intersection_error = bootstrap(rvs, bisector_slope)
 besty2 = np.polyval(np.array([bisector_trend_mean, bisector_intersection]), rvs)
 fig2, ax2 = plt.subplots(1, figsize=(10, 10))
-ax2.errorbar(rvs, bisector_slope, yerr=bisector_slope_error, fmt='ko')
 ax2.plot(rvs, besty2, 'k-')
+ax2.errorbar(rvs, bisector_slope, yerr=bisector_slope_error, fmt='ko')
 ax2.set_xlabel('Radial velocity (km/s)')
 ax2.set_ylabel('Bisector slope')
 ax2.legend(('Bisector slopes', 'y={:.3f} ({:.3f})x + {:.3f} ({:.3f})'.format(bisector_trend_mean,
@@ -154,4 +178,4 @@ ax2.legend(('Bisector slopes', 'y={:.3f} ({:.3f})x + {:.3f} ({:.3f})'.format(bis
                                                                              bisector_intersection_error),), )
 fig2.subplots_adjust(bottom=0.08, top=0.95, left=0.10, right=0.95)
 fig2.savefig('{}/BISECTORS_JMCC.png'.format(ccf_dir), dpi=300)
-plt.show()
+#plt.show()

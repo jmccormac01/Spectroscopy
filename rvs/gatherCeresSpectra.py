@@ -18,7 +18,7 @@ def argParse():
     p = ap.ArgumentParser()
     p.add_argument('instrument',
                    help='name of instrument to gather spectra from',
-                   choices=['fies', 'cafe'])
+                   choices=['fies', 'cafe', 'feros'])
     return p.parse_args()
 
 if __name__ == "__main__":
@@ -41,23 +41,31 @@ if __name__ == "__main__":
                 swasp_ids.append(swasp_id)
                 if not os.path.exists('{}/{}'.format(all_spec_dir, swasp_id)):
                     os.mkdir('{}/{}'.format(all_spec_dir, swasp_id))
-            pdf = s[-1]
-            # copy the pdfs
-            print('{} {}'.format(swasp_id, pdf))
-            if not os.path.exists('{}/{}/{}'.format(all_spec_dir, swasp_id, pdf)):
-                comm = 'cp {} {}/{}'.format(pdf, all_spec_dir, swasp_id)
-                print(comm)
-                os.system(comm)
-            else:
-                print('{}/{}/{} exists...'.format(all_spec_dir, swasp_id, pdf))
-        # copy the fits spectra
+        # copy the fits spectra and pdfs
         for swasp_id in swasp_ids:
             spectra = g.glob('{}*.fits'.format(swasp_id))
-            for spectrum in spectra:
+            pdfs = g.glob('*{}*.pdf'.format(swasp_id))
+            ccfs = g.glob('*{}*.ccf'.format(swasp_id))
+            for spectrum, pdf, ccf in zip(spectra, pdfs, ccfs):
+                # spectra
                 if not os.path.exists('{}/{}/{}'.format(all_spec_dir, swasp_id, spectrum)):
                     comm2 = 'cp {} {}/{}'.format(spectrum, all_spec_dir, swasp_id)
                     print(comm2)
                     os.system(comm2)
                 else:
                     print('{}/{}/{} exists'.format(all_spec_dir, swasp_id, spectrum))
+                # pdfs
+                if not os.path.exists('{}/{}/{}'.format(all_spec_dir, swasp_id, pdf)):
+                    comm3 = 'cp {} {}/{}'.format(pdf, all_spec_dir, swasp_id)
+                    print(comm3)
+                    os.system(comm3)
+                else:
+                    print('{}/{}/{} exists'.format(all_spec_dir, swasp_id, pdf))
+                # ccfs
+                if not os.path.exists('{}/{}/{}'.format(all_spec_dir, swasp_id, ccf)):
+                    comm4 = 'cp {} {}/{}'.format(ccf, all_spec_dir, swasp_id)
+                    print(comm4)
+                    os.system(comm4)
+                else:
+                    print('{}/{}/{} exists'.format(all_spec_dir, swasp_id, ccf))
         os.chdir('../../')

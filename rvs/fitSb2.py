@@ -141,15 +141,14 @@ def doubleVoigt(x, m1, s1g, s1l, a1, m2, s2g, s2l, a2):
 if __name__ == "__main__":
     args = argParse()
     # read in the CCF to fit
-    data_dir = "/Users/jmcc/Dropbox/NGTS/FullInstrument/Planets/NGTS-4b/HARPS"
-    data_file_base = "HARPS_Master_10spectra"
-    data_file = "{}/{}.ccf".format(data_dir, data_file_base)
+    #data_dir = "/Users/jmcc/Dropbox/NGTS/FullInstrument/Planets/NGTS-4b/HARPS"
+    data_dir = "/Users/jmcc/Dropbox/WASP-115/FromPeople/GH/ccf"
+    data_file_base = "SOPHIE.2013-07-30T03:00:15.727_newccf_G2_A"
+    data_file = "{}/{}.txt".format(data_dir, data_file_base)
     init_priors_file = "{}/{}.sb2".format(data_dir, data_file_base)
     # used for CCF text files
     x, y = np.loadtxt(data_file, usecols=[0, 1], unpack=True)
     yerr = np.array([0.005]*len(y))
-    # get initial parameters and priors
-    init_priors = readInitialAndPriors(init_priors_file)
 
     if args.plot_ccf_only:
         fig, ax = plt.subplots(1, figsize=(10, 10))
@@ -159,6 +158,10 @@ if __name__ == "__main__":
         if not args.norm:
             plt.show()
             sys.exit()
+
+    # get initial parameters and priors
+    # do this after potentially just looking at the CCF for guess params
+    init_priors = readInitialAndPriors(init_priors_file)
 
     # normalise the flat part of CCF
     if args.norm:
